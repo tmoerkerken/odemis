@@ -671,13 +671,14 @@ class Sparc2AlignTab(Tab):
         #                     internal or external spectrograph
         self._alignbtn_to_mode = collections.OrderedDict((
             (panel.btn_align_lens, "lens-align"),
-            (panel.btn_align_mirror, "mirror-align"),
+            # (panel.btn_align_mirror, "mirror-align"),
             (panel.btn_align_lens2, "lens2-align"),
             (panel.btn_align_centering, "center-align"),
             (panel.btn_align_ek, "ek-align"),
             (panel.btn_align_fiber, "fiber-align"),
             (panel.btn_align_streakcam, "streak-align"),
-            (panel.btn_align_light_in, "light-in-align"),
+            (panel.btn_align_light_in_spot, "light-in-align-spot"),
+            (panel.btn_align_light_in_ar, "light-in-align-ar"),
             (panel.btn_align_tunnel_lens, "tunnel-lens-align"),
         ))
 
@@ -690,7 +691,8 @@ class Sparc2AlignTab(Tab):
             "ek-align": "ek-align",
             "fiber-align": "fiber-align",
             "streak-align": "streak-align",
-            "light-in-align": "light-in-align",
+            "light-in-align-spot": "light-in-align-spot",
+            "light-in-align-ar": "light-in-align-ar",
             "tunnel-lens-align": "tunnel-lens-align",
         }
         # Note: ActuatorController automatically hides the unnecessary alignment panels, based on the axes present.
@@ -907,7 +909,7 @@ class Sparc2AlignTab(Tab):
         if mode != "center-align":
             if main.light_aligner:
                 main.light_aligner.position.unsubscribe(self._onLightAlignPos)
-        if mode != "light-in-align":
+        if mode != "light-in-align-spot":
             if main.spec_switch:
                 main.spec_switch.position.unsubscribe(self._onSpecSwitchPos)
             if main.light_aligner:
@@ -1105,7 +1107,35 @@ class Sparc2AlignTab(Tab):
                 self.panel.pnl_lens_tunnel.Show(False)
 
             self.panel.pnl_moi_settings.Show(False)
-        elif mode == "light-in-align":
+        elif mode == "light-in-align-spot":
+            self.tab_data_model.focussedView.value = self.panel.vp_align_lens.view  # allows to see the focused slit line
+            self._ccd_stream.should_update.value = True
+            if self._mirror_settings_controller:
+                self._mirror_settings_controller.enable(False)
+            self.panel.pnl_mirror.Show(False)
+            self.panel.pnl_lens_mover.Show(False)
+            self.panel.pnl_lens_switch.Show(False)
+            if main.mirror:
+                self.panel.pnl_focus.Show(False)
+            else:
+                # If no mirror => ELIM => allow to focus, but only manually
+                self.panel.pnl_focus.Show(True)
+                self.panel.btn_autofocus.Enable(False)
+                self.panel.gauge_autofocus.Enable(False)
+            self.panel.pnl_focus_ext.Show(False)
+            self.panel.pnl_fibaligner.Show(False)
+            self.panel.pnl_streak.Show(False)
+            self.panel.pnl_light_aligner.Show(True)
+            self.panel.pnl_lens_tunnel.Show(False)
+            if main.spec_switch:
+                self.panel.pnl_spec_switch.Show(True)
+                self.panel.pnl_spec_switch.Enable(False)  # Wait until the spec-switch is engaged
+            else:
+                self.panel.pnl_spec_switch.Show(False)
+
+            self.panel.pnl_moi_settings.Show(False)
+            f.add_done_callback(self._on_light_in_align_done)
+        elif mode == "light-in-align-ar":
             self.tab_data_model.focussedView.value = self.panel.vp_align_lens.view  # allows to see the focused slit line
             self._ccd_stream.should_update.value = True
             if self._mirror_settings_controller:
@@ -1177,7 +1207,7 @@ class Sparc2AlignTab(Tab):
             pages.append("doc/sparc2_fiber.html")
         elif mode == "streak-align":
             pages.append("doc/sparc2_streakcam.html")
-        elif mode == "light-in-align":
+        elif mode == "light-in-align-spot":
             # Several modules have this mode, but require different alignment procedure.
             # So we have to detect precisely which module is present (FSLM, FPLM, or ELIM).
             main = self.tab_data_model.main
@@ -1552,7 +1582,7 @@ class Sparc2AlignTab(Tab):
                 opath = "streak-focus"
         elif align_mode == "tunnel-lens-align":
             opath = "spec-focus-ext"
-        elif align_mode in ("lens-align", "lens2-align", "light-in-align"):
+        elif align_mode in ("lens-align", "lens2-align", "light-in-align-spot"):
             opath = "spec-focus"
         else:
             logging.warning("Manual focus requested not compatible with requested alignment mode %s. Do nothing.",
@@ -1578,7 +1608,7 @@ class Sparc2AlignTab(Tab):
                 self.panel.cmb_focus_detectors_ext.Enable(False)
                 self._stream_controller.pauseStreams()
             else:
-                if align_mode in ("lens-align", "lens2-align", "light-in-align"):
+                if align_mode in ("lens-align", "lens2-align", "light-in-align-spot"):
                     self._enableFocusComponents(manual=True, ccd_stream=False)
                 self._stream_controller.pauseStreams()
                 self.panel.btn_bkg_acquire.Enable(False)
@@ -1628,7 +1658,7 @@ class Sparc2AlignTab(Tab):
         if active:
             main = self.tab_data_model.main
             align_mode = self.tab_data_model.align_mode.value
-            if align_mode in ("lens-align", "lens2-align", "light-in-align"):
+            if align_mode in ("lens-align", "lens2-align", "light-in-align-spot"):
                 focus_mode = "spec-focus"
                 ss = self._focus_streams
                 btn = self.panel.btn_autofocus

@@ -729,7 +729,8 @@ class Sparc2AlignGUIData(ActuatorGUIData):
         # Mode values are different from the modes of the OpticalPathManager
         amodes = [
                   "lens-align", "mirror-align", "lens2-align", "center-align",
-                  "ek-align", "streak-align", "fiber-align", "light-in-align",
+                  "ek-align", "streak-align", "fiber-align", "light-in-align-spot",
+                  "light-in-align-ar",
                   "tunnel-lens-align",
                  ]
 
@@ -792,7 +793,10 @@ class Sparc2AlignGUIData(ActuatorGUIData):
             amodes.remove("streak-align")
 
         if main.light_aligner is None:
-            amodes.remove("light-in-align")
+            amodes.remove("light-in-align-spot")
+
+        if main.light_aligner is None:
+            amodes.remove("light-in-align-ar")
         else:
             if main.spec_switch:
                 # Check that the spec-selector has the right metadata
