@@ -555,6 +555,7 @@ def main(args):
     app.Destroy()
 
     sys.excepthook = backup_excepthook
+    return app
 
 if __name__ == '__main__':
     installThreadExcepthook()
