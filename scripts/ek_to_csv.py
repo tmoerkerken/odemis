@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 import shutil
+import textwrap
 
 import numpy as np
 import tkinter as tk
@@ -46,7 +47,7 @@ def format_data_for_projection(data):
 def get_matching_background_file(fp):
     """
     Tries to find background file in same folder as measurement.
-    See `BACKGROUND_SPECIFIERS` and `BACKGROUND_SEPARATORS` for configuration.
+    See `BACKGROUND_SPECIFIERS` and `BACKGROUND_SEPARATORS` in script for configuration.
 
     Example
     -------
@@ -138,7 +139,11 @@ def path_type(arg):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Converts EK h5 files to csv')
+    parser = argparse.ArgumentParser(
+        description=f'Converts EK h5 files to csv',
+        epilog=textwrap.dedent(get_matching_background_file.__doc__),
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         '--path',
         type=path_type,
