@@ -3,6 +3,7 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
+import shutil
 
 import numpy as np
 import tkinter as tk
@@ -96,6 +97,8 @@ def process_h5(fp, output_folder, background_fp=None):
     """
     acquisition_data = hdf5.read_data(fp)
     ar_data_raw = locate_ar_spectrum_in_data(acquisition_data)
+    if not ar_data_raw:
+        raise ValueError("Data does not contain a valid EK measurement")
     background_data_raw = None
     if background_fp:
         logger.info("Found matching blank file")
@@ -175,6 +178,7 @@ def main():
     ]
     # Walk through measurements, process them one by one
     output_folder = output_folder_parent / f"output-{timestamp}"
+    succeeded_files = 0
     for filename in process_queue:
         output_filename = output_folder / filename.relative_to(fp)
         # Make sure to recursively create the nested paths if present
@@ -182,9 +186,13 @@ def main():
         try:
             logger.info(f"Processing {filename}")
             process_h5(filename, output_filename.parent)
+            succeeded_files += 1
         except Exception as e:
             logger.error(e)
             continue
+    if not succeeded_files:
+        logger.info("Cleaning up, since no files were processed")
+        shutil.rmtree(output_folder)
 
     return 0
 
