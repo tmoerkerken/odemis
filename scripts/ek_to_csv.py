@@ -98,7 +98,7 @@ def process_h5(fp, output_folder, background_fp=None):
     """
     acquisition_data = hdf5.read_data(fp)
     ar_data_raw = locate_ar_spectrum_in_data(acquisition_data)
-    if not ar_data_raw:
+    if ar_data_raw is None:
         raise ValueError("Data does not contain a valid EK measurement")
     background_data_raw = None
     if background_fp:
