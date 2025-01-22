@@ -72,7 +72,7 @@ def get_matching_background_file(fp):
         # Check in folder for one background file for all
         potential_background_files = []
         for spec in BACKGROUND_SPECIFIERS:
-            potential_background_files.extend(fp.parent.glob(f"*{spec}.h5"))
+            potential_background_files.extend(fp.parent.glob(f"{spec}.h5"))
 
         if len(potential_background_files) == 1:
             background_file = potential_background_files.pop()
@@ -88,7 +88,9 @@ def process_raw_data(measurement, name, output_folder, background_measurement=No
         measurement -= background_measurement
     measurement_formatted = format_data_for_projection(measurement)
     measurement_on_grid = project_angular_spectrum_to_grid(measurement_formatted)
-    csv.export(output_folder / f"{name}.csv", measurement_on_grid)
+    fp = output_folder / f"{name}.csv"
+    csv.export(fp, measurement_on_grid)
+    logger.info(f"CSV generated at: {fp}")
 
 
 def process_h5(fp, output_folder, background_fp=None):
@@ -102,9 +104,9 @@ def process_h5(fp, output_folder, background_fp=None):
         raise ValueError("Data does not contain a valid EK measurement")
     background_data_raw = None
     if background_fp:
-        logger.info("Found matching blank file")
         background_data = hdf5.read_data(background_fp)
         background_data_raw = locate_ar_spectrum_in_data(background_data)
+        logger.info(f"Using blank file: {background_fp}")
 
     if len(ar_data_raw.shape) == 5:
         if ar_data_raw.shape[-2:] == (1, 1):
@@ -190,7 +192,8 @@ def main():
         output_filename.parent.mkdir(parents=True, exist_ok=True)
         try:
             logger.info(f"Processing {filename}")
-            process_h5(filename, output_filename.parent)
+            background_file = get_matching_background_file(filename)
+            process_h5(filename, output_filename.parent, background_file)
             succeeded_files += 1
         except Exception as e:
             logger.error(e)
