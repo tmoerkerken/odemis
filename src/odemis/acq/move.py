@@ -77,6 +77,7 @@ TFS_FIB_COLUMN_TILT = math.radians(52)
 TESCAN_FIB_COLUMN_TILT = math.radians(55)
 ZEISS_FIB_COLUMN_TILT = math.radians(54)
 
+
 class MicroscopePostureManager:
     def __new__(cls, microscope):
         role = microscope.role
@@ -96,6 +97,8 @@ class MicroscopePostureManager:
                 return super().__new__(MeteorTFS3PostureManager)
             elif stage_version == "tescan_1":
                 return super().__new__(MeteorTescan1PostureManager)
+            elif stage_version == "tescan_2":
+                return super().__new__(MeteorTescan2PostureManager)
             else:
                 raise ValueError(f"Stage version {stage_version} is not supported")
         elif role == "mimas":
@@ -1190,6 +1193,7 @@ class MeteorTFS3PostureManager(MeteorTFS1PostureManager):
         logging.debug(f"transforming from chamber to stage-bare, vshift: {vshift}, theta: {theta}, initial shift: {shift}")
         return vshift
 
+
 class MeteorZeiss1PostureManager(MeteorPostureManager):
     def __init__(self, microscope):
         super().__init__(microscope)
@@ -1872,6 +1876,91 @@ class MeteorTescan1PostureManager(MeteorPostureManager):
         """
         vshift = {"x": shift.get("x", 0), "z": shift.get("z", 0)}
         return vshift
+
+
+class MeteorTescan2PostureManager(MeteorTescan1PostureManager):
+    def __init__(self, microscope):
+        MeteorPostureManager.__init__(self, microscope)
+        # Check required metadata used during switching
+        self.required_keys.add(model.MD_CALIB)
+        self.check_stage_metadata(required_keys=self.required_keys)
+        required_calib = {model.MD_SAMPLE_PRE_TILT, "x_0", "y_0", "z_ct", "dx", "dy", "b_y"}
+
+        # but it has a default value, so it is never required.
+        self.check_calib_data(required_calib)
+        if not {"x", "y", "rz", "rx"}.issubset(self.stage.axes):
+            raise KeyError("The stage misses 'x', 'y', 'rx' or 'rz' axes")
+
+        self._initialise_transformation(axes=["y", "z"], rotation=self.pre_tilt)
+        self.create_sample_stage()
+        self.postures = [SEM_IMAGING, FM_IMAGING]
+        # These positions are "optional", and only used with Odemis advanced
+        stage_md = self.stage.getMetadata()
+        if model.MD_FAV_MILL_POS_ACTIVE in stage_md:
+            self.postures.append(MILLING)
+        if model.MD_FAV_FIB_POS_ACTIVE in stage_md:
+            self.postures.append(FIB_IMAGING)
+
+    def create_sample_stage(self):
+
+        self.sample_stage = SampleStage(name="Sample Stage",
+                                        role="stage",
+                                        stage_bare = self.stage,
+                                        posture_manager=self)
+
+    def _transformFromSEMToMeteor(self, pos: Dict[str, float]) -> Dict[str, float]:
+        """
+        Transforms the current stage position from the SEM imaging area to the
+        meteor/FM imaging area.
+        :param pos: (dict str->float) the initial stage position.
+        :return: (dict str->float) the transformed position.
+        """
+        ...  # TODO: implement
+
+    def _transformFromMeteorToSEM(self, pos: Dict[str, float]) -> Dict[str, float]:
+        """
+        Transforms the current stage position from the meteor/FM imaging area
+        to the SEM imaging area.
+        :param pos: (dict str->float) the initial stage position.
+        :return: (dict str->float) the transformed stage position.
+        """
+        ...  # TODO: implement
+
+    def _transformFromFIBToMeteor(self, pos: Dict[str, float]) -> Dict[str, float]:
+        """
+        Transforms the current stage position from the FIB imaging area to the
+        meteor/FM imaging area.
+        :param pos: (dict str->float) the initial stage position.
+        :return: (dict str->float) the transformed position.
+        """
+        ...  # TODO: implement
+
+    def _transformFromMeteorToFIB(self, pos: Dict[str, float]) -> Dict[str, float]:
+        """
+        Transforms the current stage position from the meteor/FM imaging area to the FIB imaging area.
+        :param pos: (dict str->float) the initial stage position.
+        :return: (dict str->float) the transformed stage position.
+        """
+        ...  # TODO: implement
+
+    def _transformFromSEMToFIB(self, pos: Dict[str, float]) -> Dict[str, float]:
+        """
+        Transforms the current stage position from SEM imaging to the FIB imaging area.
+        :param pos: (dict str->float) the initial stage position.
+        :return: (dict str->float) the transformed stage position.
+        """
+        ...  # TODO: implement
+
+    def _transformFromFIBToSEM(self, pos: Dict[str, float]) -> Dict[str, float]:
+        """
+        Transforms the current stage position from FIB imaging to the SEM imaging area.
+        :param pos: (dict str->float) the initial stage position.
+        :return: (dict str->float) the transformed stage position.
+        """
+        ...  # TODO: implement
+
+    def _transformFromChamberToStage(self, shift: Dict[str, float]) -> Dict[str, float]:
+        ...  # TODO: implement
 
 
 class MimasPostureManager(MicroscopePostureManager):
