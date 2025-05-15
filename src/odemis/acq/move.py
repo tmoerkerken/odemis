@@ -1557,6 +1557,8 @@ class MeteorTescan1PostureManager(MeteorPostureManager):
 
         # Automatic conversion to sample-stage axes
         self._initialise_transformation(axes=["y", "z"], rotation=self.pre_tilt, shear=shear, scale=scale)
+        # TODO: Generalize this posture manager for TESCAN 1 and 2
+        # If tescan 1:
         self.postures = [SEM_IMAGING, FM_IMAGING]
 
     def check_calib_data(self, required_keys: set):
@@ -1912,10 +1914,47 @@ class MeteorTescan2PostureManager(MeteorTescan1PostureManager):
         """
         Transforms the current stage position from the SEM imaging area to the
         meteor/FM imaging area.
-        :param pos: (dict str->float) the initial stage position.
-        :return: (dict str->float) the transformed position.
+        :param pos: the current stage position.
+        :return: the transformed position.
         """
-        ...  # TODO: implement
+        stage_md = self.stage.getMetadata()
+        transformed_pos = pos.copy()
+
+        # Call out calibrated values and stage tilt and rotation angles
+        calibrated_values = stage_md[model.MD_CALIB]
+        fm_pos_active = stage_md[model.MD_FAV_FM_POS_ACTIVE]
+
+        # Define values that are used more than once
+        rx_sem = pos["rx"]  # Current tilt angle (can differ per point of interest)
+        rx_fm = fm_pos_active["rx"]  # Calibrated tilt angle, for imaging perpendicular to objective
+        x_0 = calibrated_values["x_0"]
+        y_0 = calibrated_values["y_0"]
+        z_ct = calibrated_values["z_ct"]
+        b_y = calibrated_values["b_y"]
+        b_z = (pos["z"] - z_ct) * math.cos(rx_sem) + b_y * math.sin(rx_sem)
+
+        # Calculate the equivalent coordinates of the (0-degree tilt) calibrated position,
+        # at the SEM position stage tilt
+        sem_current_pos_x = x_0
+        sem_current_pos_y = y_0 - b_y * (1 - 1 / math.cos(rx_sem)) - b_z * math.tan(rx_sem)
+        sem_current_pos_z = 0 - b_y * math.tan(rx_sem) - b_z * (1 - 1 / math.cos(rx_sem))
+
+        # Calculate the equivalent coordinates of the calibrated position, at the FM position
+        fm_target_pos_x = x_0 + calibrated_values["dx"]
+        fm_target_pos_y = y_0 + calibrated_values["dy"] - b_y * (1 - 1 / math.cos(rx_fm)) - b_z * math.tan(rx_fm)
+        fm_target_pos_z = 0 - b_y * math.tan(rx_fm) - b_z * (1 - 1 / math.cos(rx_fm))
+
+        # Use the above reference positions to calculate the equivalent coordinates of the point of interest,
+        # at the FM position.
+        # Note that the 180-degree rotation is taken care of by swapping the +/- signs for x and y (wrt the m equation).
+        transformed_pos["x"] = fm_target_pos_x + (sem_current_pos_x - pos["x"])
+        transformed_pos["y"] = fm_target_pos_y + (sem_current_pos_y - pos["y"])
+        transformed_pos["z"] = fm_target_pos_z + (pos["z"] - sem_current_pos_z)
+
+        # Update the angles to the FM position angles
+        transformed_pos.update(fm_pos_active)
+
+        return transformed_pos
 
     def _transformFromMeteorToSEM(self, pos: Dict[str, float]) -> Dict[str, float]:
         """
@@ -2578,6 +2617,7 @@ class EnzelPostureManager(MicroscopePostureManager):
         # None of the above -> unknown position
         return UNKNOWN
 
+
 class SampleStage(model.Actuator):
     """
     Stage wrapper component which converts the stage position to the sample stage position.
@@ -2728,6 +2768,7 @@ class SampleStage(model.Actuator):
 
     def stop(self, axes=None):
         self._stage_bare.stop()
+
 
 def calculate_stage_tilt_from_milling_angle(milling_angle: float, pre_tilt: float, column_tilt: int = math.radians(52)) -> float:
     """Calculate the stage tilt from the milling angle and the pre-tilt.
