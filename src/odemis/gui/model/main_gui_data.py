@@ -332,11 +332,11 @@ class MainGUIData(object):
             elif self.role == "mbsem":
                 required_roles += ["e-beam", "stage"]
 
-            # (special case): remove stage role for meteor tfs_3, as it's replaced with sample_stage
+            # (special case): remove stage role for meteor tfs_3, TESCAN, as it's replaced with sample_stage
             if self.role == "meteor":
                 stage_bare = model.getComponent(role="stage-bare")
                 md = stage_bare.getMetadata().get(model.MD_CALIB, {})
-                if md.get("version", "tfs_1") == "tfs_3":
+                if md.get("version", "tfs_1") in ["tfs_3", "tescan_2"]:
                     required_roles.remove("stage")
 
             for crole in required_roles:
