@@ -94,8 +94,8 @@ class MicroscopePostureManager:
                 return super().__new__(MeteorTFS1PostureManager)
             elif stage_version == "tfs_3":
                 return super().__new__(MeteorTFS3PostureManager)
-            elif stage_version == "tescan_1":
-                return super().__new__(MeteorTescan1PostureManager)
+            elif stage_version in ["tescan_1", "tescan_2"]:
+                return super().__new__(MeteorTescanPostureManager)
             else:
                 raise ValueError(f"Stage version {stage_version} is not supported")
         elif role == "mimas":
@@ -1497,7 +1497,7 @@ class MeteorZeiss1PostureManager(MeteorPostureManager):
                 future._task_state = FINISHED
 
 
-class MeteorTescan1PostureManager(MeteorPostureManager):
+class MeteorTescanPostureManager(MeteorPostureManager):
     def __init__(self, microscope):
         super().__init__(microscope)
         # Check required metadata used during switching
@@ -1515,16 +1515,16 @@ class MeteorTescan1PostureManager(MeteorPostureManager):
             comp = model.getComponent(name="Linked YZ")
             self.pre_tilt = comp.getMetadata()[model.MD_ROTATION_COR]
 
-        # Y/Z axes are not perpendicular. The angle depends on rx (if rx==0°, they are perpendicular)
-        # To compensate for this, we use shear and scale.
-        stage_md = self.stage.getMetadata()
-        rx_fm = stage_md[model.MD_FAV_FM_POS_ACTIVE]["rx"]
-        shear = (-math.tan(rx_fm), 0)
-        scale = (1, 1 / math.cos(rx_fm))
-
         # Automatic conversion to sample-stage axes
-        self._initialise_transformation(axes=["y", "z"], rotation=self.pre_tilt, shear=shear, scale=scale)
+        self._initialise_transformation(axes=["y", "z"], rotation=self.pre_tilt)
+        self.create_sample_stage()
         self.postures = [SEM_IMAGING, FM_IMAGING]
+
+    def create_sample_stage(self):
+        self.sample_stage = SampleStage(name="Sample Stage",
+                                        role="stage",
+                                        stage_bare = self.stage,
+                                        posture_manager=self)
 
     def check_calib_data(self, required_keys: set):
         """

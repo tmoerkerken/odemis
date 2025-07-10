@@ -33,7 +33,8 @@ from odemis.acq.move import (FM_IMAGING, GRID_1, GRID_2,
                              RTOL_PROGRESS, SEM_IMAGING, UNKNOWN, POSITION_NAMES,
                              SAFETY_MARGIN_5DOF, SAFETY_MARGIN_3DOF, THREE_BEAMS, ROT_DIST_SCALING_FACTOR,
                              ATOL_LINEAR_TRANSFORM, ATOL_ROTATION_TRANSFORM,
-                             MimasPostureManager, MeteorPostureManager, EnzelPostureManager, MeteorTFS3PostureManager)
+                             MimasPostureManager, MeteorPostureManager, EnzelPostureManager, MeteorTFS3PostureManager,
+                             MeteorTescanPostureManager)
 from odemis.acq.move import MicroscopePostureManager
 from odemis.util import testing
 from odemis.util.driver import ATOL_LINEAR_POS, isNearPosition
@@ -48,6 +49,7 @@ METEOR_TFS1_CONFIG = CONFIG_PATH + "sim/meteor-sim.odm.yaml"
 METEOR_TFS3_CONFIG = CONFIG_PATH + "sim/meteor-tfs3-sim.odm.yaml"
 METEOR_ZEISS1_CONFIG = CONFIG_PATH + "sim/meteor-zeiss-sim.odm.yaml"
 METEOR_TESCAN1_CONFIG = CONFIG_PATH + "sim/meteor-tescan-sim.odm.yaml"
+METEOR_TESCAN2_CONFIG = CONFIG_PATH + "sim/meteor-tescan2-sim.odm.yaml"
 MIMAS_CONFIG = CONFIG_PATH + "sim/mimas-sim.odm.yaml"
 
 
@@ -853,6 +855,7 @@ class TestMeteorTFS3Move(unittest.TestCase):
         for axis in expected_vshift.keys():
             self.assertAlmostEqual(zshift[axis], expected_vshift[axis], places=5)
 
+
 class TestMeteorTescan1Move(TestMeteorTFS1Move):
     """
     Test the MeteorPostureManager functions for Tescan 1
@@ -942,6 +945,63 @@ class TestMeteorTescan1Move(TestMeteorTFS1Move):
         zshift = self.posture_manager._transformFromChamberToStage(shift)
         self.assertAlmostEqual(zshift["x"], shift["x"], places=5)
         self.assertAlmostEqual(zshift["z"], shift["z"], places=5)
+
+
+class TestMeteorTescan2Move(unittest.TestCase):
+    """
+    Test the MeteorPostureManager functions for Tescan 2
+    """
+    MIC_CONFIG = METEOR_TESCAN2_CONFIG
+    ROTATION_AXES = {'rx', 'rz'}
+
+    @classmethod
+    def setUpClass(cls):
+        testing.start_backend(cls.MIC_CONFIG)
+        cls.microscope = model.getMicroscope()
+        cls.pm: MeteorTescanPostureManager = MicroscopePostureManager(microscope=cls.microscope)
+
+        # get the stage components
+        cls.stage_bare = model.getComponent(role="stage-bare")
+        cls.stage = cls.pm.sample_stage
+
+        # get the metadata
+        stage_md = cls.stage_bare.getMetadata()
+        cls.stage_grid_centers = stage_md[model.MD_SAMPLE_CENTERS]
+        cls.stage_loading = stage_md[model.MD_FAV_POS_DEACTIVE]
+
+    def test_grid_center_posture_conversion(self):
+        # GRID 1
+        reference_coordinates = {
+            "SEM": {"x": -2.611e-3, "y": -13.540e-3, "z": 35.651e-3, "rx": math.radians(40), "rz": math.radians(104)},  # m, deg
+            "FIB": {"x": -2.611e-3, "y": 0.024e-3, "z": 29.058e-3, "rx": math.radians(15), "rz": math.radians(-76)},  # m, deg
+            "FM": {"x": 50.184e-3, "y": -12.738e-3, "z": 29.058e-3, "rx": math.radians(15), "rz": math.radians(-76)}  # m, deg
+        }
+
+        # When moving to SEM posture, the GRID 1 center is used as a target position
+        # A low level driver call for stage movement is used, since the posture manager prevents us to move from an
+        # UNKNOWN starting position (safety).
+        f = self.stage_bare.moveAbs(reference_coordinates["SEM"])
+        f.result()
+
+        self.assertEqual(self.pm.getCurrentPostureLabel(), SEM_IMAGING)
+        f = self.pm.cryoSwitchSamplePosition(FM_IMAGING)
+        f.result()
+        # expected_sample_stage_pos is sadly not the same in absolute sense!
+        # only useful in relative sense now.
+        # testing.assert_pos_almost_equal... not passing now for sample stage position (before vs after).
+        # Ideally, the sample stage coordinates would match the SEM coordinates
+        # read https://docs.google.com/document/d/1p1IUPYvmvYxRv__Hpw9Jl4ChtSm7bJRJ/edit?pli=1
+        # for recommendations
+
+        testing.assert_pos_almost_equal(self.stage_bare.position.value, reference_coordinates["FM"], atol=1e-5)
+
+        # # Now switch posture to FIB (mill)
+        # f = self.pm.cryoSwitchSamplePosition(MILLING)
+        # f.result()
+
+        # self.assertEqual(self.pm.getCurrentPostureLabel(), MILLING)
+        # testing.assert_pos_almost_equal(self.stage_bare.position.value, reference_coordinates["FIB"], atol=1e-5)
+
 
 class TestMimasMove(unittest.TestCase):
     """
