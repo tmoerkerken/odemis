@@ -27,6 +27,7 @@ import argparse
 import codecs
 import importlib
 import inspect
+import json
 import logging
 import math
 import numbers
@@ -416,6 +417,139 @@ def print_metadata(component, pretty):
             name = md2name.get(key, "'%s'" % (key,))
             print("%s\ttype:metadata\tvalue:%s" % (name, value))
 
+def collect_vattribute(component: object, name: str, va: object) -> dict:
+    """
+    Collect information about a VigilantAttribute into a dictionary.
+
+    component (Component): the component containing the VigilantAttribute
+    name (str): the name of the VigilantAttribute
+    va (VigilantAttribute): the VigilantAttribute to collect data from
+    return (dict): a dictionary with attribute information
+    """
+    # Convert value to a human-friendly format
+    val = va.value
+    if name in VAS_COMPS:
+        try:
+            val = {c.name for c in val}
+        except Exception:
+            logging.info("Failed to convert %s to component names", name)
+
+    # Convert to nicer unit for user (radians to degrees)
+    if va.unit and va.unit == "rad" and isinstance(val, numbers.Real):
+        try:
+            val = math.degrees(val)
+        except Exception:
+            logging.warning("Failed to convert %s to degrees", name)
+
+    # For position, convert axes from radians to degrees
+    if (name == "position" and isinstance(va.value, dict) and
+        hasattr(component, "axes") and isinstance(component.axes, dict)):
+        pos_deg = {}
+        for an, pos in va.value.items():
+            try:
+                axis_def = component.axes[an]
+            except KeyError:
+                logging.warning("axes is missing axis '%s' from .position", an)
+                continue
+            if axis_def.unit == "rad":
+                pos_deg[an] = math.degrees(pos)
+            else:
+                pos_deg[an] = pos
+        if pos_deg:
+            val = pos_deg
+
+    # Convert set/dict to JSON-serializable format
+    if isinstance(val, dict):
+        val = {k: val[k] for k in sorted(val.keys())}
+    elif isinstance(val, set):
+        val = sorted(list(val))
+
+    result: dict = {"name": name, "type": "vigilant_attribute", "value": val}
+
+    if va.unit:
+        result["unit"] = va.unit
+
+    result["readonly"] = va.readonly
+
+    try:
+        varange = va.range
+        result["range"] = [varange[0], varange[1]]
+    except AttributeError:
+        pass
+
+    try:
+        vachoices = va.choices
+        if isinstance(vachoices, dict):
+            result["choices"] = vachoices
+        else:
+            result["choices"] = sorted(list(vachoices))
+    except AttributeError:
+        pass
+
+    return result
+
+def collect_component_attributes(component: object) -> dict:
+    """
+    Collect all attributes of a component into a dictionary.
+    
+    component (Component): the component to collect attributes from
+    return (dict): a dictionary with all component information
+    """
+    result: dict = {
+        "name": component.name,
+        "role": component.role,
+        "affects": sorted(list(component.affects.value))
+    }
+    
+    # Collect RO attributes
+    ro_attrs: dict = {}
+    for name, value in model.getROAttributes(component).items():
+        if name not in non_roattributes_names:
+            # Special handling for axes
+            if name == "axes":
+                ro_attrs[name] = {
+                    "type": "ro_attribute",
+                    "value": {k: str(value[k]) for k in sorted(value.keys())}
+                }
+            else:
+                ro_attrs[name] = {"type": "ro_attribute", "value": str(value)}
+    if ro_attrs:
+        result["ro_attributes"] = ro_attrs
+    
+    # Collect VA attributes
+    va_attrs: dict = {}
+    for name, va in model.getVAs(component).items():
+        if name not in VAS_HIDDEN:
+            va_attrs[name] = collect_vattribute(component, name, va)
+    if va_attrs:
+        result["vigilant_attributes"] = va_attrs
+    
+    # Collect data flows
+    data_flows: dict = {}
+    for name, df in model.getDataFlows(component).items():
+        data_flows[name] = {"type": "data_flow"}
+    if data_flows:
+        result["data_flows"] = data_flows
+    
+    # Collect events
+    events: dict = {}
+    for name, evt in model.getEvents(component).items():
+        events[name] = {"type": "event"}
+    if events:
+        result["events"] = events
+    
+    # Collect metadata
+    md = component.getMetadata()
+    if md:
+        md2name = map_metadata_names()
+        metadata: dict = {}
+        for key, value in md.items():
+            name = md2name.get(key, "'%s'" % (key,))
+            metadata[name] = value
+        result["metadata"] = metadata
+    
+    return result
+
 def print_attributes(component, pretty):
     if pretty:
         print("Component '%s':" % component.name)
@@ -465,19 +599,30 @@ def get_detector(comp_name):
         raise ValueError("Component %s is not a detector" % comp.name)
     return comp
 
-def list_properties(comp_name, pretty=True):
+def list_properties(comp_name: str, pretty: bool = True, json_output: bool = False) -> None:
     """
-    print the data-flows and VAs of a component
-    comp_name (string): name of the component or "*"
+    Print the data-flows and VAs of a component.
+    
+    comp_name (str): name of the component or "*"
     pretty (bool): if True, display with pretty-printing
+    json_output (bool): if True, output as JSON
     """
-    if comp_name == "*":
-        for c in model.getComponents():
-            print_attributes(c, pretty)
-            print("")
+    if json_output:
+        if comp_name == "*":
+            components_data = [collect_component_attributes(c) for c in model.getComponents()]
+            print(json.dumps(components_data, indent=2, default=str))
+        else:
+            component = get_component(comp_name)
+            component_data = collect_component_attributes(component)
+            print(json.dumps(component_data, indent=2, default=str))
     else:
-        component = get_component(comp_name)
-        print_attributes(component, pretty)
+        if comp_name == "*":
+            for c in model.getComponents():
+                print_attributes(c, pretty)
+                print("")
+        else:
+            component = get_component(comp_name)
+            print_attributes(component, pretty)
 
 def set_attr(comp_name, attr_val_str):
     """
@@ -936,6 +1081,8 @@ def main(args):
                          default=0, help="set verbosity level (0-2, default = 0)")
     opt_grp.add_argument("--machine", dest="machine", action="store_true", default=False,
                          help="display in a machine-friendly way (i.e., no pretty printing)")
+    opt_grp.add_argument("--json", dest="json_output", action="store_true", default=False,
+                         help="display output in JSON format")
     dm_grp = parser.add_argument_group('Microscope management')
     dm_grpe = dm_grp.add_mutually_exclusive_group()
     dm_grpe.add_argument("--kill", "-k", dest="kill", action="store_true", default=False,
@@ -1071,7 +1218,7 @@ def main(args):
         elif options.list:
             list_components(pretty=not options.machine)
         elif options.listprop is not None:
-            list_properties(options.listprop, pretty=not options.machine)
+            list_properties(options.listprop, pretty=not options.machine, json_output=options.json_output)
         elif options.setattr is not None:
             for l in options.setattr:
                 # C A B E F => C, {A: B, E: F}
