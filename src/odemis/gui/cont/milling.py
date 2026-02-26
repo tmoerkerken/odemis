@@ -78,8 +78,9 @@ def _get_milling_colour(task_name: str, idx: int) -> str:
         return MILLING_COLOURS_CANONICAL[task_name]
     return MILLING_COLOURS_CYCLE[idx % len(MILLING_COLOURS_CYCLE)]
 
-def _get_pattern_centre(pos: Tuple[float, float], stream: acqstream.Stream) -> Tuple[float, float]:
-    """Convert the position to the centre of the image coordinate (pattern coordinate system)"""
+# FIXME: ajdust the name to match _to_physical_position()
+def pos_to_relative(pos: Tuple[float, float], stream: acqstream.Stream) -> Tuple[float, float]:
+    """Convert the position from absolute position to relative position to the centre of image the given stream"""
     # get the center of the image, center of the pattern
     stream_pos = stream.raw[0].metadata[model.MD_POS]
 
@@ -89,8 +90,8 @@ def _get_pattern_centre(pos: Tuple[float, float], stream: acqstream.Stream) -> T
 
     return center_x, center_y
 
-def _to_physical_position(pos: Tuple[float, float], stream: acqstream.Stream) -> Tuple[float, float]:
-    """Convert the position (pattern coordinates) to the physical coordinate position"""
+def pos_to_absolute(pos: Tuple[float, float], stream: acqstream.Stream) -> Tuple[float, float]:
+    """Convert the position from relative to absolute coordinate position"""
     # get the center of the image, center of the pattern
     stream_pos = stream.raw[0].metadata[model.MD_POS]
 
@@ -110,7 +111,8 @@ def rectangle_pattern_to_shape(canvas,
     rect = RectangleOverlay(cnvs=canvas, colour = colour, show_selection_points = False)
     width = pattern.width.value
     height = pattern.height.value
-    x, y = _to_physical_position(pattern.center.value, stream) # image coordinates -> physical coordinates
+    x, y = pos_to_absolute(pattern.center.value, stream) # image coordinates -> physical coordinates
+    #x, y = pattern.center.value
     if name is not None:
         rect.name.value = name
 
@@ -134,6 +136,9 @@ def rectangle_pattern_to_shape(canvas,
     return rect
 
 class MillingTaskController:
+    """
+    Takes care of handling the "PATTERNS" collapsible panel, which shows the selected milling tasks, and their settings.
+    """
     def __init__(self, tab_data, tab_panel, tab):
         """
         tab_data (MicroscopyGUIData): the representation of the microscope GUI
@@ -169,17 +174,18 @@ class MillingTaskController:
         self.canvas.add_world_overlay(self.rectangles_overlay)
         self.canvas.Bind(wx.EVT_LEFT_DOWN, self.on_mouse_down) # bind the mouse down event
 
+        # FIXME: to do every time the feature is changed
         # set all the tasks to be checked by default
-        self.selected_tasks = model.ListVA(list(self.milling_tasks.keys())) # all tasks are selected by default
-        self._panel.milling_task_chk_list.SetItems(self.selected_tasks.value)
-        for i in range(self._panel.milling_task_chk_list.GetCount()):
-            self._panel.milling_task_chk_list.Check(i)
-        self._panel.milling_task_chk_list.Bind(wx.EVT_CHECKLISTBOX, self._update_selected_tasks)
-        self.selected_tasks.subscribe(self.draw_milling_tasks, init=True)
+        self.selected_tasks = model.ListVA([]) # all tasks are selected by default
+        # for i in range(self._panel.milling_task_chk_list.GetCount()):
+        #     self._panel.milling_task_chk_list.Check(i)
+        # self._panel.milling_task_chk_list.Bind(wx.EVT_CHECKLISTBOX, self._update_selected_tasks)
+        #self.selected_tasks.subscribe(self.draw_milling_tasks, init=True)
         # self.selected_tasks.subscribe(self._update_mill_btn, init=True)
 
+        self._tab_data_model.main.currentFeature.subscribe(self._on_current_feature_changes, init=True)
         # update the panels for the milling tasks
-        self._update_panels()
+        #self._update_panels()
 
         # By default, all widgets are hidden => show button + estimated time at initialization
         self._panel.txt_milling_est_time.Hide()
@@ -207,9 +213,24 @@ class MillingTaskController:
         # hide the milling button because we are using it for a workflow
         # self._panel.btn_run_milling.Hide()
 
+    def _on_current_feature_changes(self, feature: Optional[CryoFeature]):
+        """
+        Called when the current feature is changed
+        """
+        if feature is None:
+            # TODO set the milling tasks an empty list
+            self.set_milling_tasks({})
+            # TODO: => empty the panel patterns
+            self._update_pattern_panels()
+            return
+
+        self.set_milling_tasks(feature.milling_tasks)
+
+
+        self._update_pattern_panels()
 
     @call_in_wx_main
-    def _update_panels(self):
+    def _update_pattern_panels(self):
         if hasattr(self._panel.pnl_patterns, "_panel_sizer"):
             # self._panel.pnl_patterns._panel_sizer.Clear()
             # self._panel.pnl_patterns.Destroy()
@@ -275,6 +296,13 @@ class MillingTaskController:
         self._panel.pnl_patterns.Layout()
         self._panel.Layout()
 
+        # force the scrolled parent to recompute its layout, otherwise pnl_patterns
+        # keeps the previous virtual size until the user triggers a resize
+        scrolled_parent = getattr(self._panel, "scr_win_right", None)
+        if scrolled_parent:
+            scrolled_parent.FitInside()
+            scrolled_parent.SendSizeEvent()
+
     @call_in_wx_main
     def _on_shapes_update(self, shapes):
         """Called when the shapes are updated"""
@@ -305,10 +333,12 @@ class MillingTaskController:
             p_pos = active_canvas.view_to_phys(pos, active_canvas.get_half_buffer_size())
             logging.debug(f"shift + control pressed, mouse_pos: {pos}, phys_pos: {p_pos}")
 
+
             # TODO: validate if click is outside image bounds, don't move the pattern
             # TODO: validate whether the pattern is within the image bounds before moving it
             # move selected stream to position
-            self.draw_milling_tasks(p_pos)
+            self.move_milling_tasks(pos_to_relative(p_pos, self.acq_cont.stream))
+            self.draw_milling_tasks()
             return
 
         # super event passthrough
@@ -316,19 +346,34 @@ class MillingTaskController:
 
     @call_in_wx_main
     def set_milling_tasks(self, milling_tasks: Dict[str, MillingTaskSettings]):
+        """
+        Sets the milling tasks displayed to the provided ones
+        """
         # Check if tasks actually changed to avoid the panel to flicker
-        if self.milling_tasks == milling_tasks:
+        if self.milling_tasks is milling_tasks:
             logging.debug("Milling tasks unchanged, skipping update")
             return
 
-        self.milling_tasks = copy.deepcopy(milling_tasks)
+        self.milling_tasks = milling_tasks
+
+        # Update the selected tasks check box list
+
+        all_tasks = []  # names of all the existing tasks
+        selected_tasks = []  # names of the milling task selected (for milling)
+
+        for name, milling_settings in milling_tasks.items():
+            all_tasks.append(name)
+            if milling_settings.selected.value:
+                selected_tasks.append(name)
 
         # unsubscribe from updates to the selected tasks
-        self.selected_tasks.unsubscribe(self._on_saving_position)
+        self.selected_tasks.unsubscribe(self._on_selected_tasks)
         self._panel.milling_task_chk_list.Unbind(wx.EVT_CHECKLISTBOX, handler=self._update_selected_tasks)
 
         # update the selected tasks to tasks in milling_tasks
-        self.selected_tasks.value = list(self.milling_tasks.keys())
+        self.selected_tasks.value = selected_tasks
+
+        self._panel.milling_task_chk_list.SetItems(self.selected_tasks.value)
 
         # update the checkboxes
         for i in range(self._panel.milling_task_chk_list.GetCount()):
@@ -336,56 +381,57 @@ class MillingTaskController:
             self._panel.milling_task_chk_list.Check(i, is_checked)
 
         self._panel.milling_task_chk_list.Bind(wx.EVT_CHECKLISTBOX, self._update_selected_tasks)
-        self.selected_tasks.subscribe(self._on_saving_position, init=True)
+        self.selected_tasks.subscribe(self._on_selected_tasks, init=True)
 
-        self._update_panels()
-        self._panel.Layout()
+        # self._update_pattern_panels()
+        # self._panel.Layout()
 
-        # force the scrolled parent to recompute its layout, otherwise pnl_patterns
-        # keeps the previous virtual size until the user triggers a resize
-        scrolled_parent = getattr(self._panel, "scr_win_right", None)
-        if scrolled_parent:
-            scrolled_parent.FitInside()
-            scrolled_parent.SendSizeEvent()
+
     # NOTE: we should add the bottom right viewport as the feature viewport, to show the saved reference image and the milling patterns
     # it's too confusing to hav the 'live' view and the 'saved' view in the same viewport
     # -> workflow tab is probably easier to use for this purpose
 
-    def _on_saving_position(self, tasks):
+    def _on_selected_tasks(self, tasks):
         if self._tab_data.main.currentFeature.value is None:
             return
 
-        feature_stage_bare = self._tab_data.main.currentFeature.value.get_posture_position(MILLING)
-        pos = self.pm.to_sample_stage_from_stage_position(feature_stage_bare, MILLING)
+        self.feature_controller.save_milling_tasks(self.milling_tasks, tasks)
+        self.draw_milling_tasks()
 
-        self.draw_milling_tasks((pos["x"], pos["y"]))
-
-    @call_in_wx_main
-    def draw_milling_tasks(self, pos: Optional[Tuple[float, float]] = None, convert_pos: bool = True):
+    def move_milling_tasks(self, pos: Tuple[float, float]):
         """Redraw all milling tasks on the canvas. Clears the rectangles_overlay first,
         and then redraws all the patterns. If pos is given, the patterns are drawn at that position,
         otherwise they are drawn at the existing positions.
-        :param pos: the position to draw the patterns at (Optional)
-        :param convert_pos: whether to convert the position to the centre of the image coordinate (pattern coordinate system)
+        :param pos: the position to draw the patterns at (in m, in relative coordinates to the center of the FoV)
         """
+        for task in self.milling_tasks.values():
+            for pattern in task.patterns:
+                pattern.center.value = pos
+
+        self.feature_controller.save_milling_tasks(self.milling_tasks, self.selected_tasks.value)
+
+    @call_in_wx_main
+    def draw_milling_tasks(self, _=None):
         self.rectangles_overlay.clear()
         self.rectangles_overlay.clear_labels()
         tasks_to_draw = self.selected_tasks.value
 
         # if there are tasks_to_draw that aren't in the milling tasks, add them from default
-        existing_tasks = list(self.milling_tasks.keys())
-        for task_name in tasks_to_draw:
-            if task_name not in existing_tasks:
-                logging.debug(
-                    f"Task {task_name} not found in milling tasks, but requested, adding from default."
-                )
-                self.milling_tasks[task_name] = copy.deepcopy(
-                    self._default_milling_tasks[task_name]
-                )
-                # match the center to the first tasks' center
-                self.milling_tasks[task_name].patterns[0].center.value = (
-                    self.milling_tasks[existing_tasks[0]].patterns[0].center.value
-                )
+
+        # Probably never used in practise?
+        # existing_tasks = list(self.milling_tasks.keys())
+        # for task_name in tasks_to_draw:
+        #     if task_name not in existing_tasks:
+        #         logging.debug(
+        #             f"Task {task_name} not found in milling tasks, but requested, adding from default."
+        #         )
+        #         self.milling_tasks[task_name] = copy.deepcopy(
+        #             self._default_milling_tasks[task_name]
+        #         )
+        #         # match the center to the first tasks' center
+        #         self.milling_tasks[task_name].patterns[0].center.value = (
+        #             self.milling_tasks[existing_tasks[0]].patterns[0].center.value
+        #         )
 
         # stream
         if not self.milling_tasks:
@@ -397,14 +443,6 @@ class MillingTaskController:
         if not tasks_to_draw:
             self.canvas.request_drawing_update()
             return
-
-        # convert the position to the centre of the image coordinate (pattern coordinate system)
-        if isinstance(pos, tuple):
-            if convert_pos:
-                pos = _get_pattern_centre(pos, self.acq_cont.stream)
-            for task_name, task in self.milling_tasks.items():
-                for pattern in task.patterns:
-                    pattern.center.value = pos # image center
 
         # redraw all patterns
         for i, (task_name, task) in enumerate(self.milling_tasks.items()):
@@ -424,18 +462,6 @@ class MillingTaskController:
 
         # validate the patterns
         self._on_shapes_update(self.rectangles_overlay._shapes.value)
-
-        # auto save the milling tasks on the feature
-        self.feature_controller.save_milling_tasks(self.milling_tasks, self.selected_tasks.value)
-
-        return
-
-        # notes:
-        # can we fill the rectangles?
-        # can we re-colour / hide the control points?
-        # can we toggle labels visiblility
-        # can we toggle shape visibility
-        # how to rotate the shapes?
 
     def _update_selected_tasks(self, evt: wx.Event):
         checked_indices = self._panel.milling_task_chk_list.GetCheckedItems()

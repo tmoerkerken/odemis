@@ -50,7 +50,8 @@ class MillingSettings:
                 "field_of_view": self.field_of_view.value,
                 "mode": self.mode.value,
                 "channel": self.channel.value,
-                "align": self.align.value}
+                "align": self.align.value
+                }
 
     @staticmethod
     def from_dict(data: dict) -> "MillingSettings":
@@ -71,8 +72,10 @@ class MillingTaskSettings:
 
     def __init__(self, milling: MillingSettings,
                  patterns: List[MillingPatternParameters],
-                 name: str):
+                 name: str,
+                 selected: bool = True):
         self.name: str = name
+        self.selected: bool = selected
         self.milling: MillingSettings = milling
         self.patterns: List[MillingPatternParameters] = patterns
 
@@ -81,6 +84,7 @@ class MillingTaskSettings:
         :return: dictionary containing the milling task settings
         """
         return {"name": self.name,
+                "selected": self.selected,
                 "milling": self.milling.to_dict(),
                 "patterns": [pattern.to_dict() for pattern in self.patterns]}
 
@@ -91,6 +95,7 @@ class MillingTaskSettings:
         :return: MillingTaskSettings"""
         return MillingTaskSettings(
             name=data.get("name", "Milling Task"),
+            selected=data.get("selected", True),
             milling=MillingSettings.from_dict(data["milling"]),
             patterns=[PATTERN_NAME_TO_CLASS[p["pattern"]].from_dict(p) for p in data["patterns"]])
 
@@ -102,6 +107,9 @@ class MillingTaskSettings:
         :return: list of individual shapes to be drawn on the microscope
         """
         patterns = []
+        if not self.selected:  # TODO: check this filter works
+            return patterns
+
         for pattern in self.patterns:
             patterns.extend(pattern.generate())
         return patterns

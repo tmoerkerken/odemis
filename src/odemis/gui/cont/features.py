@@ -223,9 +223,9 @@ class CryoFeatureController(object):
             return
 
         # filter out the selected tasks
-        milling_tasks = {k: v for k, v in milling_tasks.items() if k in selected_milling_tasks}
-
-        feature.milling_tasks = copy.deepcopy(milling_tasks)
+        feature_milling_tasks = {k: v for k, v in milling_tasks.items() if k in selected_milling_tasks}
+        # FIXME: why do we need deepcopy here?
+        feature.milling_tasks = copy.deepcopy(feature_milling_tasks)
         save_features(self._tab.conf.pj_last_path, self._tab_data_model.main.features.value)
 
     # TODO: pattern size not updating
@@ -394,8 +394,8 @@ class CryoFeatureController(object):
                                                                     va_2_ctrl=self._on_feature_focus_pos)
 
         # if FIBSEM mode, and milling tasks are available, re-draw
-        if self.acqui_mode is guimod.AcquiMode.FIBSEM:
-            self._tab.milling_task_controller.set_milling_tasks(feature.milling_tasks)
+        # if self.acqui_mode is guimod.AcquiMode.FIBSEM:
+        #     self._tab.milling_task_controller.set_milling_tasks(feature.milling_tasks)
 
     def _on_feature_focus_pos(self, fm_focus_position: dict):
         # Set the feature Z ctrl with the focus position

@@ -60,6 +60,7 @@ from odemis.gui.cont.acquisition._constants import VAS_NO_ACQUISITION_EFFECT
 from odemis.gui.cont.acquisition.overview_stream_acq import (
     OverviewStreamAcquiController, CorrelationDialogController,
 )
+from odemis.gui.cont.milling import pos_to_relative
 from odemis.gui.util import call_in_wx_main, wxlimit_invocation
 from odemis.gui.util.widgets import (
     ProgressiveFutureConnector,
@@ -823,8 +824,11 @@ class CryoAcquiController(object):
                         feature.fm_focus_position.value = {"z": poi_coords[2]}
                     # Draw milling position in FIBSEM tab around the projected POI
                     target = correlation_dict.fib_projected_pois[0]
-                    fibsem_tab.milling_task_controller.draw_milling_tasks(pos=(target.coordinates.value[0],
-                                                                               target.coordinates.value[1]))
+                    rel_pos = pos_to_relative(target.coordinates.value[:2], fibsem_tab.milling_task_controller.acq_cont.stream)
+                    fibsem_tab.milling_task_controller.move_milling_tasks(
+                        rel_pos
+                    )
+                    fibsem_tab.milling_task_controller.draw_milling_tasks()
 
     @call_in_wx_main
     def _on_filename(self, name):
