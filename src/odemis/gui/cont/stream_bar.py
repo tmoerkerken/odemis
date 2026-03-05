@@ -857,21 +857,21 @@ class StreamBarController(object):
             # Simulate clicking the remove stream button (will take care or removing the stream & panel)
             sp.on_remove_btn(stream)
 
-    def removeStream(self, stream):
-        """ Removes the given stream
+    def removeStream_user_action(self, stream):
+        """
+        Removes the given stream due to explicit user action (clicked X button).
+        Marks the stream in the removal registry so it won't be reloaded.
 
         Args:
             stream (Stream): the stream to remove
 
         Note:
             The stream panel is to be destroyed separately via the stream_bar.
-
-        It's ok to call if the stream has already been removed.
-
+            This method should ONLY be called when the user explicitly removes a stream.
         """
-        logging.debug("Stream %s removal requested", stream.name.value)
+        logging.debug("User removed stream %s", stream.name.value)
 
-        # Mark stream as removed in the registry if it has a known source file
+        # Mark stream as removed in the registry
         # This prevents it from being reloaded on re-acquisition or tab switch
         # Supports multi-image files where one file contains multiple streams
         if hasattr(stream, '_source_file_path') and stream._source_file_path:
@@ -884,6 +884,20 @@ class StreamBarController(object):
                 else:
                     logging.debug(f"Stream {stream.name.value} marked as removed in registry")
 
+        # Delegate to internal cleanup method
+        self._removeStream_internal(stream)
+
+    def _removeStream_internal(self, stream):
+        """
+        Internal method to remove a stream from memory (not from registry).
+        Used for automatic cleanup (e.g., feature switching) where we don't want
+        to prevent the stream from being reloaded later.
+
+        Args:
+            stream (Stream): the stream to remove
+        """
+        logging.debug("Stream %s internal removal", stream.name.value)
+
         # don't schedule any more
         self._unscheduleStream(stream)
         self._disconnectROI(stream)
@@ -894,13 +908,22 @@ class StreamBarController(object):
                 # logging.warning("> %s > %s", v, stream)
                 v.removeStream(stream)
 
-        # Remove from the list of streams
+        # Remove from the list of streams in the tab model
         try:
             self._tab_data_model.streams.value.remove(stream)
-            logging.debug("%s removed", stream)
+            logging.debug("%s removed from tab model", stream)
         except ValueError:
             # Can happen, as all the tabs receive this event
-            logging.info("%s not found, so not removed", stream)
+            logging.info("%s not found in tab model, so not removed", stream)
+
+        # Also remove from the feature's streams (if applicable)
+        # This ensures that when switching back to this feature, we don't try to re-display a deleted stream
+        if hasattr(stream, '_source_file_path'):
+            for feature in self._tab_data_model.main.features.value:
+                if stream in feature.streams.value:
+                    feature.streams.value.remove(stream)
+                    logging.debug("%s removed from feature %s", stream, feature.name.value)
+                    break
 
         # Remove the corresponding stream controller
         for sc in self.stream_controllers:
@@ -914,6 +937,23 @@ class StreamBarController(object):
         # collected immediately, which would keep a reference to the Stream object, which in turn
         # would prevent the Stream render thread from terminating.
         gc.collect()
+
+    def removeStream(self, stream):
+        """ Removes the given stream (internal cleanup, doesn't register in removal registry)
+
+        Args:
+            stream (Stream): the stream to remove
+
+        Note:
+            The stream panel is to be destroyed separately via the stream_bar.
+
+        It's ok to call if the stream has already been removed.
+
+        For user-initiated stream removal (X button click), call removeStream_user_action() instead.
+
+        """
+        # Delegate to internal method for automatic cleanup during feature switching
+        self._removeStream_internal(stream)
 
     def clear(self, clear_model=True):
         """

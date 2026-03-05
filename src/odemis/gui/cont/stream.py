@@ -256,7 +256,14 @@ class StreamController(object):
         self.entries = []
 
         if self._sb_ctrl:
-            self._sb_ctrl.removeStream(self.stream)
+            # Check if this was a user-initiated removal (X button click) vs automatic cleanup
+            user_action = getattr(self.stream_panel, '_user_initiated_removal', False)
+            if user_action:
+                # User explicitly removed the stream, so mark it in the registry
+                self._sb_ctrl.removeStream_user_action(self.stream)
+            else:
+                # Automatic cleanup (e.g., feature switching), don't mark in registry
+                self._sb_ctrl.removeStream(self.stream)
 
         gc.collect()
 

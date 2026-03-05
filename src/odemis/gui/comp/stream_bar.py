@@ -162,6 +162,8 @@ class StreamBar(wx.Panel):
         """
         st = evt.spanel.stream
         logging.debug("User removed stream (panel) %s", st.name.value)
+        # Mark the stream panel as user-initiated removal so the destroy callback can handle it appropriately
+        evt.spanel._user_initiated_removal = True
         # delete stream panel (which will "Destroy" it, which will trigger on_streamp_destroy())
         self.remove_stream_panel(evt.spanel)
 
