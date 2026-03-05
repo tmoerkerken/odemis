@@ -42,7 +42,7 @@ from odemis.gui.conf.data import get_local_vas
 from odemis.gui.cont.stream import StreamController
 from odemis.gui.model import TOOL_NONE, TOOL_SPOT
 from odemis.gui.util import call_in_wx_main
-from odemis.acq.feature import load_feature_streams_from_disk
+from odemis.acq.feature import load_feature_streams_from_disk, mark_stream_as_removed
 from odemis.util.dataio import data_to_static_streams
 
 # There are two kinds of controllers:
@@ -870,6 +870,15 @@ class StreamBarController(object):
 
         """
         logging.debug("Stream %s removal requested", stream.name.value)
+
+        # Mark stream as removed in the registry if it has a known source file
+        # This prevents it from being reloaded on re-acquisition or tab switch
+        if hasattr(stream, '_source_file_path') and stream._source_file_path:
+            project_path = self._tab_data_model.main.project_path.value
+            if project_path:
+                mark_stream_as_removed(project_path, stream._source_file_path)
+                logging.debug(f"Stream {stream.name.value} marked as removed in registry")
+
         # don't schedule any more
         self._unscheduleStream(stream)
         self._disconnectROI(stream)

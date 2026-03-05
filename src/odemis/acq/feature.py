@@ -362,10 +362,137 @@ def read_features(project_dir: str) -> List[CryoFeature]:
         return json.load(jsonfile, cls=FeaturesDecoder)
 
 
+def _load_removed_streams_registry(project_path: str) -> dict:
+    """
+    Load the registry of removed streams from the project directory.
+
+    :param project_path: path to the project directory
+    :return: dictionary with removed stream filenames (keys are filenames, values are removal info)
+    """
+    registry_path = os.path.join(project_path, "removed_streams.json")
+    if not os.path.exists(registry_path):
+        return {}
+
+    try:
+        with open(registry_path, "r") as f:
+            registry = json.load(f)
+            if not isinstance(registry, dict):
+                logging.warning("Removed streams registry has unexpected format, treating as empty")
+                return {}
+            return registry
+    except (IOError, json.JSONDecodeError) as e:
+        logging.warning(f"Failed to load removed streams registry: {e}")
+        return {}
+
+
+def _save_removed_streams_registry(project_path: str, registry: dict) -> None:
+    """
+    Save the registry of removed streams to the project directory.
+
+    :param project_path: path to the project directory
+    :param registry: dictionary with removed stream filenames
+    """
+    registry_path = os.path.join(project_path, "removed_streams.json")
+
+    try:
+        with open(registry_path, "w") as f:
+            json.dump(registry, f, indent=2)
+    except IOError as e:
+        logging.error(f"Failed to save removed streams registry: {e}")
+
+
+def _get_stream_basename(filepath: str) -> str:
+    """
+    Get the basename of a stream file, used as the identifier in the registry.
+
+    :param filepath: full path to the stream file
+    :return: basename (filename without extension)
+    """
+    return os.path.splitext(os.path.basename(filepath))[0]
+
+
+def is_stream_removed(project_path: str, stream_filepath: str) -> bool:
+    """
+    Check if a stream file is registered as removed.
+
+    :param project_path: path to the project directory
+    :param stream_filepath: path to the stream file to check
+    :return: True if the stream is marked as removed, False otherwise
+    """
+    if not project_path or not stream_filepath:
+        return False
+
+    registry = _load_removed_streams_registry(project_path)
+    stream_id = _get_stream_basename(stream_filepath)
+    return stream_id in registry
+
+
+def mark_stream_as_removed(project_path: str, stream_filepath: str) -> None:
+    """
+    Mark a stream file as removed (user explicitly deleted it from UI).
+    Stores removal info in the project's removed_streams.json registry.
+
+    :param project_path: path to the project directory
+    :param stream_filepath: path to the stream file to mark as removed
+    """
+    if not project_path or not stream_filepath:
+        return
+
+    registry = _load_removed_streams_registry(project_path)
+    stream_id = _get_stream_basename(stream_filepath)
+
+    # Record removal with timestamp
+    registry[stream_id] = {
+        "filepath": stream_filepath,
+        "timestamp": time.time(),
+    }
+
+    _save_removed_streams_registry(project_path, registry)
+    logging.debug(f"Stream {stream_id} marked as removed in registry")
+
+
+def clear_removed_streams_for_feature(project_path: str, feature_name: str) -> None:
+    """
+    Clear the removed streams registry for a specific feature.
+    This is useful when a feature is deleted, allowing its stream files to be
+    reloaded if needed in future.
+
+    :param project_path: path to the project directory
+    :param feature_name: name of the feature whose removed streams to clear
+    """
+    if not project_path or not feature_name:
+        return
+
+    try:
+        registry = _load_removed_streams_registry(project_path)
+        if not registry:
+            return
+
+        # Find and remove entries for this feature
+        # Stream IDs typically follow pattern: *-feature_name-*.tif
+        entries_to_remove = []
+        for stream_id in registry.keys():
+            # Check if this stream ID belongs to the given feature
+            if f"-{feature_name}-" in stream_id:
+                entries_to_remove.append(stream_id)
+
+        for stream_id in entries_to_remove:
+            del registry[stream_id]
+            logging.debug(f"Cleared removal marker for stream: {stream_id}")
+
+        if entries_to_remove:
+            _save_removed_streams_registry(project_path, registry)
+            logging.debug(f"Cleared {len(entries_to_remove)} removed stream markers for feature {feature_name}")
+    except Exception as e:
+        logging.error(f"Error clearing removed streams for feature {feature_name}: {e}")
+
+
 def load_feature_streams_from_disk(feature: "CryoFeature", path: str) -> None:
     """
     Load the acquired stream files for a single feature from the project directory
     and append them to feature.streams.
+    Automatically skips any streams that are marked as removed in the registry.
+    Also stores the source file path in each stream for future reference.
 
     :param feature: the feature whose streams to load
     :param path: path to the project directory containing the stream files
@@ -376,7 +503,18 @@ def load_feature_streams_from_disk(feature: "CryoFeature", path: str) -> None:
         stream_filenames.extend(glob.glob(glob_path.format(ext=ext)))
 
     for fname in sorted(stream_filenames):
-        feature.streams.value.extend(data_to_static_streams(open_acquisition(fname)))
+        # Skip streams that have been explicitly removed by the user
+        if is_stream_removed(path, fname):
+            logging.debug(f"Skipping removed stream: {fname}")
+            continue
+
+        loaded_streams = data_to_static_streams(open_acquisition(fname))
+        # Store the source file path in each loaded stream for future reference
+        for stream in loaded_streams:
+            # Add source file path as an attribute (will be used when removing stream)
+            stream._source_file_path = fname
+        feature.streams.value.extend(loaded_streams)
+
 
 
 def load_project_data(path: str) -> dict:

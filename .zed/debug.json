@@ -1,0 +1,27 @@
+// Project-local debug tasks
+// For more documentation, see: https://zed.dev/docs/languages/python#debugging
+[
+  {
+    "label": "ODEMIS Backend (odemisd)",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "odemis.odemisd.main",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "ODEMIS GUI Debug",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/src/odemis/gui/main.py",
+    "args": ["--log-level", "2"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "ODEMIS GUI Standalone",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/src/odemis/gui/main.py",
+    "args": ["--standalone", "--log-level", "2"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  }
+]
