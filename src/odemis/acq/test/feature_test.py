@@ -280,6 +280,44 @@ class TestStreamRemovalRegistry(unittest.TestCase):
         self.assertTrue(is_stream_removed(self.test_dir, stream_file1))
         self.assertFalse(is_stream_removed(self.test_dir, stream_file2))
 
+    def test_multi_image_stream_with_stream_indices(self) -> None:
+        """
+        Test that stream indices work correctly for differentiating streams.
+        This tests the API for supporting future multi-stream files.
+        """
+        # Test marking specific stream indices
+        stream_file = os.path.join(self.test_dir, "test-TestFeature-001.tif")
+
+        # Index 0 (default stream from the file)
+        self.assertFalse(is_stream_removed(self.test_dir, stream_file, stream_index=0))
+
+        # Mark index 1 as removed (hypothetical second stream from same file)
+        mark_stream_as_removed(self.test_dir, stream_file, stream_index=1)
+
+        # Verify: index 0 not removed, index 1 is removed
+        self.assertFalse(is_stream_removed(self.test_dir, stream_file, stream_index=0))
+        self.assertTrue(is_stream_removed(self.test_dir, stream_file, stream_index=1))
+        self.assertFalse(is_stream_removed(self.test_dir, stream_file, stream_index=2))
+
+        # Mark index 2 as removed
+        mark_stream_as_removed(self.test_dir, stream_file, stream_index=2)
+
+        # Verify: index 0 not removed, indices 1 and 2 are removed
+        self.assertFalse(is_stream_removed(self.test_dir, stream_file, stream_index=0))
+        self.assertTrue(is_stream_removed(self.test_dir, stream_file, stream_index=1))
+        self.assertTrue(is_stream_removed(self.test_dir, stream_file, stream_index=2))
+
+        # Verify registry format includes stream_index
+        with open(os.path.join(self.test_dir, "removed_streams.json"), "r") as f:
+            import json
+            registry = json.load(f)
+
+        # Check that entries contain stream_index
+        self.assertIn("test-TestFeature-001#1", registry)
+        self.assertIn("test-TestFeature-001#2", registry)
+        self.assertEqual(registry["test-TestFeature-001#1"]["stream_index"], 1)
+        self.assertEqual(registry["test-TestFeature-001#2"]["stream_index"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

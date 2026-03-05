@@ -401,49 +401,62 @@ def _save_removed_streams_registry(project_path: str, registry: dict) -> None:
         logging.error(f"Failed to save removed streams registry: {e}")
 
 
-def _get_stream_basename(filepath: str) -> str:
+def _get_stream_identifier(filepath: str, stream_index: int = None) -> str:
     """
-    Get the basename of a stream file, used as the identifier in the registry.
+    Get a unique identifier for a stream.
+    Handles both single streams and multiple streams from the same file.
+
+    For files with multiple streams (e.g., multi-image TIFF), uses filename + index.
+    For single streams, uses just filename (index=0 or None are equivalent).
 
     :param filepath: full path to the stream file
-    :return: basename (filename without extension)
+    :param stream_index: index of the stream within the file (0-based), or None for single stream
+    :return: unique stream identifier
     """
-    return os.path.splitext(os.path.basename(filepath))[0]
+    basename = os.path.splitext(os.path.basename(filepath))[0]
+    if stream_index is not None and stream_index > 0:
+        return f"{basename}#{stream_index}"
+    return basename
 
 
-def is_stream_removed(project_path: str, stream_filepath: str) -> bool:
+def is_stream_removed(project_path: str, stream_filepath: str, stream_index: int = None) -> bool:
     """
-    Check if a stream file is registered as removed.
+    Check if a specific stream is registered as removed.
+    Supports multi-image files where one file can contain multiple streams.
 
     :param project_path: path to the project directory
-    :param stream_filepath: path to the stream file to check
+    :param stream_filepath: path to the stream file
+    :param stream_index: index of the stream within the file (0-based), or None for single stream
     :return: True if the stream is marked as removed, False otherwise
     """
     if not project_path or not stream_filepath:
         return False
 
     registry = _load_removed_streams_registry(project_path)
-    stream_id = _get_stream_basename(stream_filepath)
+    stream_id = _get_stream_identifier(stream_filepath, stream_index)
     return stream_id in registry
 
 
-def mark_stream_as_removed(project_path: str, stream_filepath: str) -> None:
+def mark_stream_as_removed(project_path: str, stream_filepath: str, stream_index: int = None) -> None:
     """
-    Mark a stream file as removed (user explicitly deleted it from UI).
+    Mark a specific stream as removed (user explicitly deleted it from UI).
     Stores removal info in the project's removed_streams.json registry.
+    Supports multi-image files where one file can contain multiple streams.
 
     :param project_path: path to the project directory
-    :param stream_filepath: path to the stream file to mark as removed
+    :param stream_filepath: path to the stream file
+    :param stream_index: index of the stream within the file (0-based), or None for single stream
     """
     if not project_path or not stream_filepath:
         return
 
     registry = _load_removed_streams_registry(project_path)
-    stream_id = _get_stream_basename(stream_filepath)
+    stream_id = _get_stream_identifier(stream_filepath, stream_index)
 
     # Record removal with timestamp
     registry[stream_id] = {
         "filepath": stream_filepath,
+        "stream_index": stream_index,
         "timestamp": time.time(),
     }
 
@@ -492,7 +505,8 @@ def load_feature_streams_from_disk(feature: "CryoFeature", path: str) -> None:
     Load the acquired stream files for a single feature from the project directory
     and append them to feature.streams.
     Automatically skips any streams that are marked as removed in the registry.
-    Also stores the source file path in each stream for future reference.
+    Handles multi-image files where one file can contain multiple streams.
+    Also stores the source file path and stream index in each stream for future reference.
 
     :param feature: the feature whose streams to load
     :param path: path to the project directory containing the stream files
@@ -503,17 +517,21 @@ def load_feature_streams_from_disk(feature: "CryoFeature", path: str) -> None:
         stream_filenames.extend(glob.glob(glob_path.format(ext=ext)))
 
     for fname in sorted(stream_filenames):
-        # Skip streams that have been explicitly removed by the user
-        if is_stream_removed(path, fname):
-            logging.debug(f"Skipping removed stream: {fname}")
-            continue
-
         loaded_streams = data_to_static_streams(open_acquisition(fname))
-        # Store the source file path in each loaded stream for future reference
-        for stream in loaded_streams:
-            # Add source file path as an attribute (will be used when removing stream)
+
+        # Store the source file path and stream index in each loaded stream for future reference
+        # This allows tracking individual streams from multi-image files
+        for stream_index, stream in enumerate(loaded_streams):
+            # Check if this specific stream is marked as removed
+            if is_stream_removed(path, fname, stream_index=stream_index):
+                logging.debug(f"Skipping removed stream: {fname} [index {stream_index}]")
+                continue
+
+            # Store metadata for later removal tracking
             stream._source_file_path = fname
-        feature.streams.value.extend(loaded_streams)
+            stream._source_stream_index = stream_index
+            feature.streams.value.append(stream)
+
 
 
 
