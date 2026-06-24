@@ -35,6 +35,9 @@ from odemis.gui.comp.grid import ViewportGrid
 from odemis.gui.comp.stream_bar import StreamBar
 from odemis.gui.comp.viewport import MicroscopeViewport
 from odemis.gui.cont.tools import ToolBar
+from odemis.gui.layout import strings
+from odemis.gui.layout.sizers import hbox, vbox
+from odemis.gui.layout.theme import DARK, DARK_BIG, Theme
 
 
 class FrCorrelation(wx.Dialog):
@@ -79,21 +82,23 @@ class FrCorrelation(wx.Dialog):
         Close button at the bottom of the right panel.
     """
 
-    def __init__(self, parent: wx.Window) -> None:
+    def __init__(self, parent: wx.Window, theme: Theme = DARK) -> None:
         """
         Initialise the dialog and build the complete widget hierarchy.
 
         :param parent: Parent window.
+        :param theme: Visual theme to apply. Defaults to DARK.
         """
         super().__init__(
             parent,
-            title="Multipoint Correlation",
+            title=strings.TITLE_CORRELATION,
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
         )
-        self.SetBackgroundColour(wx.Colour(0, 0, 0))
+        self._theme = theme
+        self.SetBackgroundColour(theme.bg_base)
 
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        font.SetPointSize(9)
+        font.SetPointSize(theme.font_size_default)
         self.SetFont(font)
 
         self._build_layout()
@@ -108,45 +113,45 @@ class FrCorrelation(wx.Dialog):
         root_sizer.AddGrowableRow(0)
         self.SetSizer(root_sizer)
 
+        t = self._theme
+
         # ── Column 0: toolbar panel ─────────────────────────────────────────────
         toolbar_panel = wx.Panel(self)
-        toolbar_panel.SetBackgroundColour(wx.Colour(0x33, 0x33, 0x33))
+        toolbar_panel.SetBackgroundColour(t.bg_main)
         root_sizer.Add(toolbar_panel, flag=wx.EXPAND)
 
-        tb_outer = wx.BoxSizer(wx.VERTICAL)
-        toolbar_panel.SetSizer(tb_outer)
+        with vbox() as tb_outer:
+            toolbar_panel.SetSizer(tb_outer)
 
-        tb_row = wx.BoxSizer(wx.HORIZONTAL)
-        tb_outer.Add(tb_row)
-
-        tb_row.Add((0, 0), proportion=1, flag=wx.EXPAND)
-        self.correlation_toolbar = ToolBar(toolbar_panel, style=wx.VERTICAL)
-        tb_row.Add(self.correlation_toolbar)
-        tb_row.Add((0, 0), proportion=1, flag=wx.EXPAND)
+            with hbox() as tb_row:
+                tb_outer.Add(tb_row)
+                tb_row.Add((0, 0), proportion=1, flag=wx.EXPAND)
+                self.correlation_toolbar = ToolBar(toolbar_panel, style=wx.VERTICAL)
+                tb_row.Add(self.correlation_toolbar)
+                tb_row.Add((0, 0), proportion=1, flag=wx.EXPAND)
 
         # ── Column 1: viewport grid ─────────────────────────────────────────────
         self.pnl_correlation_grid = ViewportGrid(self)
         root_sizer.Add(self.pnl_correlation_grid, proportion=1, flag=wx.EXPAND)
 
         self.vp_correlation_tl = MicroscopeViewport(self.pnl_correlation_grid)
-        self.vp_correlation_tl.SetForegroundColour(wx.Colour(0xBF, 0xBF, 0xBF))
-        self.vp_correlation_tl.SetBackgroundColour(wx.Colour(0, 0, 0))
+        self.vp_correlation_tl.SetForegroundColour(t.fg_viewport)
+        self.vp_correlation_tl.SetBackgroundColour(t.bg_base)
 
         self.vp_correlation_tr = MicroscopeViewport(self.pnl_correlation_grid)
-        self.vp_correlation_tr.SetForegroundColour(wx.Colour(0xBF, 0xBF, 0xBF))
-        self.vp_correlation_tr.SetBackgroundColour(wx.Colour(0, 0, 0))
+        self.vp_correlation_tr.SetForegroundColour(t.fg_viewport)
+        self.vp_correlation_tr.SetBackgroundColour(t.bg_base)
 
         # ── Column 2: right panel ───────────────────────────────────────────────
         right_panel = wx.Panel(self, size=(400, -1))
-        right_panel.SetBackgroundColour(wx.Colour(0x33, 0x33, 0x33))
+        right_panel.SetBackgroundColour(t.bg_main)
         right_panel.SetWindowStyle(wx.BORDER_NONE)
         root_sizer.Add(right_panel, flag=wx.EXPAND)
 
-        right_sizer = wx.BoxSizer(wx.VERTICAL)
-        right_panel.SetSizer(right_sizer)
-
-        self._build_scroll_panel(right_panel, right_sizer)
-        self._build_close_bar(right_panel, right_sizer)
+        with vbox() as right_sizer:
+            right_panel.SetSizer(right_sizer)
+            self._build_scroll_panel(right_panel, right_sizer)
+            self._build_close_bar(right_panel, right_sizer)
 
         # Trigger a layout pass so that all child windows receive EVT_SIZE,
         # matching the implicit behaviour of XRC's LoadDialog.  This ensures
@@ -161,12 +166,14 @@ class FrCorrelation(wx.Dialog):
         :param right_panel: Parent panel for the scrolled window.
         :param right_sizer: Sizer of right_panel to attach the scrolled window to.
         """
+        t = self._theme
+
         self.scr_win_right = wx.ScrolledWindow(
             right_panel,
             size=(400, -1),
             style=wx.VSCROLL,
         )
-        self.scr_win_right.SetBackgroundColour(wx.Colour(0x33, 0x33, 0x33))
+        self.scr_win_right.SetBackgroundColour(t.bg_main)
         self.scr_win_right.EnableScrolling(False, True)
         self.scr_win_right.SetScrollbars(-1, 10, 1, 1)
         right_sizer.Add(
@@ -176,15 +183,15 @@ class FrCorrelation(wx.Dialog):
         )
         right_sizer.SetItemMinSize(self.scr_win_right, 400, 400)
 
-        scroll_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.scr_win_right.SetSizer(scroll_sizer)
+        with vbox() as scroll_sizer:
+            self.scr_win_right.SetSizer(scroll_sizer)
 
-        fold_bar = FoldPanelBar(self.scr_win_right)
-        fold_bar.SetBackgroundColour(wx.Colour(0x33, 0x33, 0x33))
-        scroll_sizer.Add(fold_bar, flag=wx.EXPAND)
+            fold_bar = FoldPanelBar(self.scr_win_right)
+            fold_bar.SetBackgroundColour(t.bg_main)
+            scroll_sizer.Add(fold_bar, flag=wx.EXPAND)
 
-        self._build_fp_correlation_panel(fold_bar)
-        self._build_fp_correlation_streams(fold_bar)
+            self._build_fp_correlation_panel(fold_bar)
+            self._build_fp_correlation_streams(fold_bar)
 
     def _build_fp_correlation_panel(self, fold_bar: FoldPanelBar) -> None:
         """
@@ -192,48 +199,50 @@ class FrCorrelation(wx.Dialog):
 
         :param fold_bar: Parent FoldPanelBar to which this item is added.
         """
+        t = self._theme
+
         self.fp_correlation_panel = FoldPanelItem(fold_bar, label="")
 
         self.pnl_correlation = wx.Panel(self.fp_correlation_panel)
-        pnl_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.pnl_correlation.SetSizer(pnl_sizer)
 
-        # Button row: delete, refine, status text
-        btn_row = wx.BoxSizer(wx.HORIZONTAL)
-        pnl_sizer.Add(btn_row)
+        with vbox() as pnl_sizer:
+            self.pnl_correlation.SetSizer(pnl_sizer)
 
-        self.btn_delete_row = ImageButton(
-            self.pnl_correlation,
-            icon=img.getBitmap("icon/ico_trash.png"),
-            height=16,
-            style=wx.ALIGN_CENTRE,
-        )
-        btn_row.Add(self.btn_delete_row, flag=wx.ALL | wx.EXPAND, border=10)
+            with hbox() as btn_row:
+                pnl_sizer.Add(btn_row)
 
-        self.btn_xyz_targeting = wx.Button(self.pnl_correlation, label="Refine")
-        btn_row.Add(self.btn_xyz_targeting)
+                self.btn_delete_row = ImageButton(
+                    self.pnl_correlation,
+                    icon=img.getBitmap("icon/ico_trash.png"),
+                    height=16,
+                    style=wx.ALIGN_CENTRE,
+                )
+                btn_row.Add(self.btn_delete_row, flag=wx.ALL | wx.EXPAND, border=10)
 
-        self.txt_refine_xyz_active = wx.StaticText(self.pnl_correlation, label=" ")
-        self.txt_refine_xyz_active.SetForegroundColour(wx.Colour(0xE5, 0xE5, 0xE5))
-        self.txt_refine_xyz_active.Show(False)
-        btn_row.Add(
-            self.txt_refine_xyz_active,
-            flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL,
-            border=10,
-        )
+                self.btn_xyz_targeting = wx.Button(self.pnl_correlation, label=strings.BTN_REFINE)
+                btn_row.Add(self.btn_xyz_targeting)
 
-        # Correlation table
-        self.table_grid = wx.grid.Grid(self.pnl_correlation, style=wx.WANTS_CHARS)
-        pnl_sizer.Add(self.table_grid)
+                self.txt_refine_xyz_active = wx.StaticText(self.pnl_correlation, label=" ")
+                self.txt_refine_xyz_active.SetForegroundColour(t.fg_label)
+                self.txt_refine_xyz_active.Show(False)
+                btn_row.Add(
+                    self.txt_refine_xyz_active,
+                    flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL,
+                    border=10,
+                )
 
-        # RMS label (hidden initially)
-        self.txt_correlation_rms = wx.StaticText(
-            self.pnl_correlation,
-            label="Correlation RMS Deviation :",
-        )
-        self.txt_correlation_rms.SetForegroundColour(wx.Colour(0xE5, 0xE5, 0xE5))
-        self.txt_correlation_rms.Show(False)
-        pnl_sizer.Add(self.txt_correlation_rms, flag=wx.LEFT, border=10)
+            # Correlation table
+            self.table_grid = wx.grid.Grid(self.pnl_correlation, style=wx.WANTS_CHARS)
+            pnl_sizer.Add(self.table_grid)
+
+            # RMS label (hidden initially)
+            self.txt_correlation_rms = wx.StaticText(
+                self.pnl_correlation,
+                label=strings.LBL_CORRELATION_RMS,
+            )
+            self.txt_correlation_rms.SetForegroundColour(t.fg_label)
+            self.txt_correlation_rms.Show(False)
+            pnl_sizer.Add(self.txt_correlation_rms, flag=wx.LEFT, border=10)
 
         self.fp_correlation_panel.add_item(self.pnl_correlation)
         fold_bar.add_item(self.fp_correlation_panel)
@@ -244,16 +253,18 @@ class FrCorrelation(wx.Dialog):
 
         :param fold_bar: Parent FoldPanelBar to which this item is added.
         """
-        self.fp_correlation_streams = FoldPanelItem(fold_bar, label="STREAMS")
-        self.fp_correlation_streams.SetForegroundColour(wx.Colour(0x1A, 0x1A, 0x1A))
-        self.fp_correlation_streams.SetBackgroundColour(wx.Colour(0x55, 0x55, 0x55))
+        t = self._theme
+
+        self.fp_correlation_streams = FoldPanelItem(fold_bar, label=strings.LBL_STREAMS)
+        self.fp_correlation_streams.SetForegroundColour(t.fg_caption)
+        self.fp_correlation_streams.SetBackgroundColour(t.bg_separator)
 
         self.pnl_correlation_streams = StreamBar(
             self.fp_correlation_streams,
             size=(300, -1),
         )
-        self.pnl_correlation_streams.SetForegroundColour(wx.Colour(0x7F, 0x7F, 0x7F))
-        self.pnl_correlation_streams.SetBackgroundColour(wx.Colour(0x33, 0x33, 0x33))
+        self.pnl_correlation_streams.SetForegroundColour(t.fg_stream_bar)
+        self.pnl_correlation_streams.SetBackgroundColour(t.bg_main)
 
         self.fp_correlation_streams.add_item(self.pnl_correlation_streams)
         fold_bar.add_item(self.fp_correlation_streams)
@@ -265,26 +276,28 @@ class FrCorrelation(wx.Dialog):
         :param right_panel: Parent panel for the close bar.
         :param right_sizer: Sizer of right_panel to attach the close bar to.
         """
+        t = self._theme
+
         close_bar = wx.Panel(right_panel)
-        close_bar.SetBackgroundColour(wx.Colour(0x44, 0x44, 0x44))
+        close_bar.SetBackgroundColour(t.bg_panel)
         right_sizer.Add(close_bar, flag=wx.EXPAND)
 
-        close_bar_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        close_bar.SetSizer(close_bar_sizer)
+        with hbox() as close_bar_sizer:
+            close_bar.SetSizer(close_bar_sizer)
 
-        self.btn_close = ImageTextButton(
-            close_bar,
-            height=48,
-            face_colour="def",
-            label="Close",
-            style=wx.ALIGN_CENTRE,
-        )
-        close_btn_font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        close_btn_font.SetPointSize(14)
-        self.btn_close.SetFont(close_btn_font)
-        close_bar_sizer.Add(
-            self.btn_close,
-            proportion=1,
-            flag=wx.TOP | wx.BOTTOM | wx.LEFT | wx.EXPAND,
-            border=10,
-        )
+            self.btn_close = ImageTextButton(
+                close_bar,
+                height=48,
+                face_colour="def",
+                label=strings.BTN_CLOSE,
+                style=wx.ALIGN_CENTRE,
+            )
+            close_btn_font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+            close_btn_font.SetPointSize(t.font_size_button_large)
+            self.btn_close.SetFont(close_btn_font)
+            close_bar_sizer.Add(
+                self.btn_close,
+                proportion=1,
+                flag=wx.TOP | wx.BOTTOM | wx.LEFT | wx.EXPAND,
+                border=10,
+            )

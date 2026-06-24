@@ -45,6 +45,9 @@ FG_COLOUR_ERROR = "#DD3939"      # Error text colour
 FG_COLOUR_RADIO_INACTIVE = "#111111"      # Text colour on radio button when inactive
 FG_COLOUR_RADIO_ACTIVE = "#106090"        # Text colour on radio button when active (same as BORDER_COLOUR_FOCUS)
 FG_COLOUR_BUTTON = "#999999"
+FG_COLOUR_VIEWPORT = "#BFBFBF"   # Foreground colour for MicroscopeViewport panels
+FG_COLOUR_LABEL = "#E5E5E5"      # Foreground colour for static text labels inside panels
+FG_COLOUR_STREAM_BAR = "#7F7F7F" # Foreground colour for stream-bar panels
 FG_COLOUR_BLIND_BLUE = "#648FFF"    # Colour-blind-friendly blue; choosen from IBM Design Library
 FG_COLOUR_BLIND_ORANGE = "#FFB000"  # Colour-blind-friendly orange; choosen from IBM Design Library
 FG_COLOUR_BLIND_PINK = "#DC267F"    # Colour-blind-friendly pink; choosen from IBM Design Library
@@ -63,6 +66,10 @@ SELECTION_COLOUR_2ND = FG_COLOUR_2ND
 # Tint value for the Spectrograph line stream, to be used for adjusting the focus
 FOCUS_STREAM_COLOR = (0, 64, 255)  # colour it blue
 CL_STREAM_SNAPSHOT_COLOR = (255, 0, 0)  # colour it red
+
+# Font sizes (points)
+FONT_SIZE_DEFAULT = 9        # Standard dialog / panel font
+FONT_SIZE_BUTTON_LARGE = 14  # Large button label (e.g. height-48 buttons)
 
 # END Colour definitions
 
