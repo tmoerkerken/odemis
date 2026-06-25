@@ -25,7 +25,7 @@ import argparse
 import logging
 from odemis import model, gui
 import odemis
-from odemis.gui import main_xrc, log, img, plugin
+from odemis.gui import main_xrc, log, img, plugin, layout
 from odemis.gui.win.thoughts import show_important_thought_dialog
 from odemis.gui.cont import acquisition
 from odemis.gui.cont.menu import MenuController
@@ -276,7 +276,7 @@ class OdemisGUIApp(wx.App):
                         "name": TabName.CRYOSECOM_CHAMBER.value,
                         "controller": CryoChamberTab,
                         "button": self.main_frame.btn_tab_cryosecom_chamber,
-                        "panel": main_xrc.xrcpnl_tab_cryosecom_chamber
+                        "panel": layout.PnlTabCryosecomChamber
                     },
                     {
                         "name": TabName.CRYOSECOM_LOCALIZATION.value,

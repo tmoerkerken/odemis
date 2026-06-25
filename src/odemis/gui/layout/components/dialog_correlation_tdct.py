@@ -36,7 +36,7 @@ from odemis.gui.comp.stream_bar import StreamBar
 from odemis.gui.comp.viewport import MicroscopeViewport
 from odemis.gui.cont.tools import ToolBar
 from odemis.gui.layout.constants import strings
-from odemis.gui.layout.wrappers.sizers import hbox, vbox
+from odemis.gui.layout.util.sizers import hbox, vbox
 from odemis.gui.layout.constants.theme import DARK, Theme
 
 
@@ -217,8 +217,8 @@ class FrCorrelation(wx.Dialog):
                     height=16,
                     style=wx.ALIGN_CENTRE,
                 )
-                btn_row.Add(self.btn_delete_row, flag=wx.ALL | wx.EXPAND, border=10)
 
+                btn_row.Add(self.btn_delete_row, flag=wx.ALL | wx.EXPAND, border=t.border_default)
                 self.btn_xyz_targeting = wx.Button(self.pnl_correlation, label=strings.BTN_REFINE)
                 btn_row.Add(self.btn_xyz_targeting)
 
@@ -228,7 +228,7 @@ class FrCorrelation(wx.Dialog):
                 btn_row.Add(
                     self.txt_refine_xyz_active,
                     flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL,
-                    border=10,
+                    border=t.border_default,
                 )
 
             # Correlation table
@@ -242,7 +242,7 @@ class FrCorrelation(wx.Dialog):
             )
             self.txt_correlation_rms.SetForegroundColour(t.fg_label)
             self.txt_correlation_rms.Show(False)
-            pnl_sizer.Add(self.txt_correlation_rms, flag=wx.LEFT, border=10)
+            pnl_sizer.Add(self.txt_correlation_rms, flag=wx.LEFT, border=t.border_default)
 
         self.fp_correlation_panel.add_item(self.pnl_correlation)
         fold_bar.add_item(self.fp_correlation_panel)
@@ -261,7 +261,7 @@ class FrCorrelation(wx.Dialog):
 
         self.pnl_correlation_streams = StreamBar(
             self.fp_correlation_streams,
-            size=(300, -1),
+            size=(t.side_panel_width, -1),
         )
         self.pnl_correlation_streams.SetForegroundColour(t.fg_stream_bar)
         self.pnl_correlation_streams.SetBackgroundColour(t.bg_main)
@@ -299,5 +299,10 @@ class FrCorrelation(wx.Dialog):
                 self.btn_close,
                 proportion=1,
                 flag=wx.TOP | wx.BOTTOM | wx.LEFT | wx.EXPAND,
-                border=10,
+                border=t.border_default,
             )
+
+
+if __name__ == "__main__":
+    from odemis.gui.layout.util.preview import run_preview
+    run_preview(FrCorrelation)

@@ -69,6 +69,8 @@ class Theme:
         Standard dialog / panel font size in points.
     font_size_button_large : int
         Large button label font size in points (e.g. height-48 Close button).
+    border_default : int
+        Standard spacing / border size in pixels used for sizer borders.
     """
 
     bg_base: str
@@ -81,6 +83,23 @@ class Theme:
     fg_caption: str
     font_size_default: int
     font_size_button_large: int
+    border_default: int
+    font_size_section_header: int
+    """Font size in points for section headings (e.g. "Project", "Position")."""
+    font_size_input: int
+    """Font size in points for text input controls and field labels."""
+    font_size_button_medium: int
+    """Font size in points for medium-sized button labels (e.g. position buttons)."""
+    font_size_arrow: int
+    """Font size in points for jog arrow buttons."""
+    border_small: int
+    """Small spacing / border size in pixels used for tighter sizer borders."""
+    fg_project_path: str
+    """Foreground colour for the project path text control."""
+    bg_project_path: str
+    """Background colour for the project path text control."""
+    side_panel_width: int
+    """Width in pixels for side panels (left control panels, stream bars, etc.)."""
 
 
 #: Default dark theme – mirrors the colours that were previously hardcoded in
@@ -96,19 +115,13 @@ DARK = Theme(
     fg_caption=gui.BG_COLOUR_LEGEND,
     font_size_default=gui.FONT_SIZE_DEFAULT,
     font_size_button_large=gui.FONT_SIZE_BUTTON_LARGE,
-)
-
-#: Light theme – inverted luminance mapping of DARK, suitable for bright
-#: environments or accessibility needs.
-DARK_BIG = Theme(
-    bg_base="#000000",
-    bg_main=gui.BG_COLOUR_MAIN,
-    bg_panel=gui.BG_COLOUR_PANEL,
-    bg_separator=gui.BG_COLOUR_SEPARATOR,
-    fg_viewport=gui.FG_COLOUR_VIEWPORT,
-    fg_label=gui.FG_COLOUR_LABEL,
-    fg_stream_bar=gui.FG_COLOUR_STREAM_BAR,
-    fg_caption=gui.BG_COLOUR_LEGEND,
-    font_size_default=int(gui.FONT_SIZE_DEFAULT * 1.5),
-    font_size_button_large=int(gui.FONT_SIZE_BUTTON_LARGE * 1.5),
+    border_default=10,
+    font_size_section_header=16,
+    font_size_input=12,
+    font_size_button_medium=11,
+    font_size_arrow=24,
+    border_small=5,
+    fg_project_path="#2FA7D4",
+    bg_project_path="#4D4D4D",
+    side_panel_width=300,  # TODO: find out why this is not picked up
 )
