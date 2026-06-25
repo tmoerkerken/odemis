@@ -35,9 +35,9 @@ from odemis.gui.comp.grid import ViewportGrid
 from odemis.gui.comp.stream_bar import StreamBar
 from odemis.gui.comp.viewport import MicroscopeViewport
 from odemis.gui.cont.tools import ToolBar
-from odemis.gui.layout import strings
-from odemis.gui.layout.sizers import hbox, vbox
-from odemis.gui.layout.theme import DARK, DARK_BIG, Theme
+from odemis.gui.layout.constants import strings
+from odemis.gui.layout.wrappers.sizers import hbox, vbox
+from odemis.gui.layout.constants.theme import DARK, Theme
 
 
 class FrCorrelation(wx.Dialog):

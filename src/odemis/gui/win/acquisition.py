@@ -50,7 +50,7 @@ from odemis.gui.conf import get_acqui_conf, util
 from odemis.gui.cont.multi_point_correlation import CorrelationPointsController
 from odemis.gui.cont.settings import LocalizationSettingsController, SecomSettingsController
 from odemis.gui.cont.stream_bar import StreamBarController
-from odemis.gui.layout.dialog_correlation_tdct import FrCorrelation
+from odemis.gui.layout.components.dialog_correlation_tdct import FrCorrelation
 from odemis.gui.main_xrc import xrcfr_acq, xrcfr_overview_acq
 from odemis.gui.model import TOOL_NONE, AcquisitionWindowData, StreamView, TOOL_ACT_ZOOM_FIT
 from odemis.gui.preset import (apply_preset, get_global_settings_entries,
