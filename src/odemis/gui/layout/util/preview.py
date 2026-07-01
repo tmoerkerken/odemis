@@ -54,8 +54,6 @@ from odemis.gui.layout.util.sizers import vbox
 _POLL_MS = 500
 _SHOW_ALL = os.environ.get("ODEMIS_PREVIEW_SHOW_ALL", "0") == "1"
 
-log = logging.getLogger(__name__)
-
 
 def _patch_show_all() -> None:
     """
@@ -71,7 +69,7 @@ def _patch_show_all() -> None:
         return _original_show(self, True)
 
     wx.Window.Show = _show_always
-    log.info("ODEMIS_PREVIEW_SHOW_ALL=1: all Show(False) calls suppressed")
+    logging.info("ODEMIS_PREVIEW_SHOW_ALL=1: all Show(False) calls suppressed")
 
 
 if _SHOW_ALL:
@@ -134,9 +132,9 @@ def _reload_layout_modules(pkg_name: str = "odemis.gui.layout") -> None:
     for name, mod in candidates:
         try:
             importlib.reload(mod)
-            log.debug("Reloaded %s", name)
+            logging.debug("Reloaded %s", name)
         except Exception:
-            log.exception("Failed to reload %s", name)
+            logging.exception("Failed to reload %s", name)
 
 
 def run_preview(cls: type, **kwargs) -> None:
@@ -158,7 +156,18 @@ def run_preview(cls: type, **kwargs) -> None:
     :param cls: The wx widget class to preview.
     :param kwargs: Optional keyword arguments forwarded to the constructor.
     """
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    # Force the root logger to INFO and ensure at least one handler is present
+    # with a readable format.  logging.basicConfig() is a no-op when handlers
+    # already exist (e.g. auto-created by odemis import warnings), so we set
+    # the level and formatter explicitly.
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if not root.handlers:
+        root.addHandler(logging.StreamHandler())
+    fmt = logging.Formatter("%(levelname)-8s %(name)s: %(message)s")
+    for handler in root.handlers:
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(fmt)
 
     mod: types.ModuleType = sys.modules[cls.__module__]
     cls_name: str = cls.__name__
@@ -216,9 +225,9 @@ def run_preview(cls: type, **kwargs) -> None:
                     container.SetSize(*display.Geometry.Size)
                 container.Show()
                 self._container = container
-                log.info("Showing %s — watching %s", cls_name, pkg_root)
+                logging.info("Showing %s — watching %s", cls_name, pkg_root)
             except Exception:
-                log.exception("Failed to create %s — fix the error and save again", cls_name)
+                logging.exception("Failed to create %s — fix the error and save again", cls_name)
 
         def _close_widget(self) -> None:
             """
@@ -262,7 +271,7 @@ def run_preview(cls: type, **kwargs) -> None:
                 return
             self._mtimes = current
             for f in changed:
-                log.info("Change detected — %s", f.relative_to(pkg_root))
+                logging.info("Change detected — %s", f.relative_to(pkg_root))
             self._reload()
 
         def _reload(self) -> None:
@@ -271,8 +280,12 @@ def run_preview(cls: type, **kwargs) -> None:
             """
             nonlocal mod
             # Store window position and size
-            self._init_size = self._container.GetSize()
-            self._init_position = self._container.GetPosition()
+            try:
+                self._init_size = self._container.GetSize()
+                self._init_position = self._container.GetPosition()
+            except:
+                # If we cannot render due to an error, just not save anything and use the previous value next time
+                pass
             self._close_widget()
             _reload_layout_modules()
             # _reload_layout_modules only covers odemis.gui.layout.* modules.
@@ -294,17 +307,20 @@ def run_preview(cls: type, **kwargs) -> None:
                     ns["__name__"] = "__preview_reload__"
                     try:
                         exec(code, ns)  # noqa: S102
-                        log.debug("Reloaded %s", mod.__file__)
+                        logging.debug("Reloaded %s", mod.__file__)
                     finally:
                         ns["__name__"] = original_name
                 except Exception:
-                    log.exception("Failed to reload %s", mod.__file__)
+                    logging.exception("Failed to reload %s", mod.__file__)
             # Re-bind mod to the freshly reloaded module object.
             mod = sys.modules[mod.__name__]
             self._open()
-            self._container.SetSize(self._init_size)
-            self._container.SetPosition(self._init_position)
-            # self._container.SetClientSize(init_client_rect)
+
+            try:
+                self._container.SetSize(self._init_size)
+                self._container.SetPosition(self._init_position)
+            except:
+                pass
 
     host = _Host()
     app.SetTopWindow(host)
