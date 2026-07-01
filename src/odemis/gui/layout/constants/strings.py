@@ -71,3 +71,34 @@ LBL_TARGET_TEMPERATURE = "Target temperature"
 
 # Log button
 TOOLTIP_LOG = "Open log panel"
+
+# ── FIBSEM tab ────────────────────────────────────────────────────────────────
+# Fold-panel section headings
+LBL_FEATURES = "FEATURES"
+LBL_STAGE_POSITION = "STAGE POSITION"
+LBL_OPTICAL_SETTINGS = "OPTICAL SETTINGS"
+LBL_ACQUISITIONS = "ACQUISITIONS"
+LBL_ACQUIRED = "ACQUIRED"
+LBL_MILLING = "MILLING"
+LBL_PATTERNS = "PATTERNS"
+
+# Generic labels
+LBL_STATUS = "Status"
+LBL_FILENAME = "Filename"
+LBL_MILLING_ANGLE = "Milling angle"
+LBL_AUTO_SAVE = "Auto save acquisition"
+LBL_ESTIMATED_TIME = "Estimated time ..."
+LBL_VIEW_BTN = "view"
+
+# Button labels
+BTN_CREATE_MOVE = "Create / Move"
+BTN_GO_TO_FEATURE = "Go to Feature"
+BTN_SAVE_POSITION = "SAVE POSITION"
+BTN_SEM_IMAGING = "SEM IMAGING"
+BTN_MILLING = "MILLING"
+BTN_ACQUIRE = "ACQUIRE"
+BTN_CHANGE_FILE = "change\u2026"
+BTN_ACQUIRE_BOTH = "ACQUIRE BOTH"
+BTN_ACQUIRE_OVERVIEW = "ACQUIRE OVERVIEW"
+BTN_CORRELATE_FIB_FM = "Correlate FIB/FM"
+BTN_MILL = "MILL"

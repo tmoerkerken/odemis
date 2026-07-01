@@ -288,7 +288,7 @@ class FrCorrelation(wx.Dialog):
             self.btn_close = ImageTextButton(
                 close_bar,
                 height=48,
-                face_colour="def",
+                face_colour=t.btn_face_default,
                 label=strings.BTN_CLOSE,
                 style=wx.ALIGN_CENTRE,
             )

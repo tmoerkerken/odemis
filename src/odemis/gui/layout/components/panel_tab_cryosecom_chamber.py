@@ -232,7 +232,7 @@ class PnlTabCryosecomChamber(wx.Panel):
                 panel,
                 icon=img.getBitmap("icon/ico_chevron_up.png"),
                 height=16,
-                face_colour="def",
+                face_colour=t.btn_face_default,
                 style=wx.ALIGN_CENTRE,
             )
             self.btn_log.SetToolTip(strings.TOOLTIP_LOG)
@@ -290,7 +290,7 @@ class PnlTabCryosecomChamber(wx.Panel):
         self.btn_change_folder = ImageTextButton(
             panel,
             height=24,
-            face_colour="blue",
+            face_colour=t.btn_face_primary,
             label=strings.BTN_NEW_PROJECT,
             style=wx.ALIGN_CENTRE,
         )
@@ -306,7 +306,7 @@ class PnlTabCryosecomChamber(wx.Panel):
         self.btn_load_project = ImageTextButton(
             panel,
             height=24,
-            face_colour="blue",
+            face_colour=t.btn_face_primary,
             label=strings.BTN_LOAD_PROJECT,
             style=wx.ALIGN_CENTRE,
         )
@@ -387,7 +387,7 @@ class PnlTabCryosecomChamber(wx.Panel):
             icon_progress=img.getBitmap(icon_progress),
             icon_on=img.getBitmap(icon_on),
             height=48,
-            face_colour="def",
+            face_colour=t.btn_face_default,
             label=label,
             size=size,
             style=wx.ALIGN_CENTRE,
@@ -525,7 +525,7 @@ class PnlTabCryosecomChamber(wx.Panel):
             self.btn_cancel = ImageTextButton(
                 parent,
                 height=24,
-                face_colour="def",
+                face_colour=t.btn_face_default,
                 label=strings.BTN_CANCEL,
                 style=wx.ALIGN_CENTRE,
             )
@@ -585,7 +585,7 @@ class PnlTabCryosecomChamber(wx.Panel):
             icon=img.getBitmap("icon/arr_down_s.png"),
             icon_on=img.getBitmap("icon/arr_down_s.png"),
             height=48,
-            face_colour="def",
+            face_colour=t.btn_face_default,
             label=strings.BTN_ADVANCED,
             style=wx.ALIGN_CENTRE,
         )
@@ -737,7 +737,7 @@ class PnlTabCryosecomChamber(wx.Panel):
             btn = ImageTextButton(
                 adv_panel,
                 height=48,
-                face_colour="def",
+                face_colour=t.btn_face_default,
                 label=label,
                 size=(64, -1),
                 style=wx.ALIGN_CENTRE,

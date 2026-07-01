@@ -94,10 +94,26 @@ class Theme:
     """Font size in points for jog arrow buttons."""
     border_small: int
     """Small spacing / border size in pixels used for tighter sizer borders."""
+    border_tiny: int
+    """Minimal spacing / border in pixels for closely coupled elements."""
+    border_medium: int
+    """Medium spacing in pixels, e.g. cancel-button top margins."""
+    border_gauge: int
+    """Top margin in pixels above gauge / estimated-time rows."""
+    indent_feature: int
+    """Left-indent in pixels for secondary feature-panel rows."""
     fg_project_path: str
     """Foreground colour for the project path text control."""
     bg_project_path: str
     """Background colour for the project path text control."""
+    fg_editable: str
+    """Foreground colour for editable fields and combo boxes (cyan accent)."""
+    fg_subtle: str
+    """Foreground colour for secondary / dimmer labels."""
+    btn_face_primary: str
+    """face_colour for primary action buttons (e.g. acquire, mill)."""
+    btn_face_default: str
+    """face_colour for default / secondary buttons (e.g. cancel, change)."""
     side_panel_width: int
     """Width in pixels for side panels (left control panels, stream bars, etc.)."""
 
@@ -115,13 +131,21 @@ DARK = Theme(
     fg_caption=gui.BG_COLOUR_LEGEND,
     font_size_default=gui.FONT_SIZE_DEFAULT,
     font_size_button_large=gui.FONT_SIZE_BUTTON_LARGE,
+    border_tiny=2,
+    border_small=5,
     border_default=10,
+    border_medium=12,
+    border_gauge=17,
     font_size_section_header=16,
     font_size_input=12,
     font_size_button_medium=12,
     font_size_arrow=24,
-    border_small=5,
+    indent_feature=82,
     fg_project_path="#2FA7D4",
     bg_project_path="#4D4D4D",
+    fg_editable="#2FA7D4",
+    fg_subtle="#DDDDDD",
+    btn_face_primary="blue",
+    btn_face_default="def",
     side_panel_width=300,  # TODO: find out why this is not picked up
 )
