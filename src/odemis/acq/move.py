@@ -789,6 +789,16 @@ class MeteorPostureManager(MicroscopePostureManager):
 
         return sr
 
+    def _enforce_scan_rotations(self):
+        """TBD"""
+        try:
+            ebeam_scanner = model.getComponent(role="e-beam")
+        except LookupError:
+            continue
+
+        rotation = scanner.rotation.value
+        ebeam_scanner.updateMetadata({model.MD_ROTATION_COR: rotation})
+
     def _set_scanner_rotation_cor(self):
         """
         Set the scanners' MD_ROTATION_COR metadata field to the current rotation, so that the
