@@ -1,3 +1,4 @@
 from .dialog_correlation_tdct import FrCorrelation
 from .panel_tab_cryosecom_chamber import PnlTabCryosecomChamber
 from .panel_tab_fibsem import PnlTabFibsem
+from .panel_tab_localization import PnlTabLocalization

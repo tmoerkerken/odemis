@@ -282,7 +282,7 @@ class OdemisGUIApp(wx.App):
                         "name": TabName.CRYOSECOM_LOCALIZATION.value,
                         "controller": LocalizationTab,
                         "button": self.main_frame.btn_tab_localization,
-                        "panel": main_xrc.xrcpnl_tab_localization
+                        "panel": layout.PnlTabLocalization
                     },
                     {
                         "name": TabName.METEOR_FIBSEM.value,
