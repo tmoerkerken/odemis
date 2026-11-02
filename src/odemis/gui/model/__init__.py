@@ -25,7 +25,7 @@ from ._constants import *
 from .file_info import FileInfo
 from .main_gui_data import CryoMainGUIData, FastEMMainGUIData, MainGUIData
 from .stream_view import (ContentView, FeatureOverviewView, FeatureView,
-                          FixedOverviewView, MicroscopeView, StreamView, View)
+                          FibsemBeamView, FixedOverviewView, MicroscopeView, StreamView, View)
 from .tab_gui_data import (AcquisitionWindowData, ActuatorGUIData,
                            AnalysisGUIData, ChamberGUIData, CryoChamberGUIData,
                            CryoCorrelationGUIData, CryoTdctCorrelationGUIData, CryoGUIData,

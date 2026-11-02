@@ -104,6 +104,9 @@ MILLING_RANGE = (math.radians(0), math.radians(30))
 TRENCHING_RANGE = (math.radians(90), MILLING_RANGE[1] + math.radians(90))
 # The absolute tolerance for non-linear axes for checking if a position corresponds to a posture.
 POSTURE_ANGLE_ATOL = math.radians(1)
+# Minimum sin(angle between beam and sample plane) used to compensate the foreshortening in the images,
+# to avoid (nearly) infinite moves with a grazing beam.
+MIN_BEAM_ANGLE_SIN = math.sin(math.radians(5))
 
 MIN_LENS_WD_FIB_VIEW_FM = 10e-3  # m, minimum working distance of the objective lens to allow FIB-view FM imaging
 
@@ -852,7 +855,7 @@ class MeteorPostureManager(MicroscopePostureManager):
 
         if posture in _SCAN_ROTATION_OFFSET:
             scan_rotation = sem_imaging_scan_rotation + _SCAN_ROTATION_OFFSET[posture]
-            for role in ("e-beam", "ion-beam"):
+            for role in ("SEM", "FIB"):
                 try:
                     scanner = model.getComponent(role=role)
                 except LookupError:
@@ -986,6 +989,39 @@ class MeteorPostureManager(MicroscopePostureManager):
             raise ValueError("Provided posture does not depend on milling angle.")
 
         return milling_angle
+
+    def get_beam_view_y_scale(self, beam: str) -> float:
+        """
+        Get the factor to convert a vertical distance measured in an SEM or FIB image to the
+        distance along the Y axis of the sample plane (sample-stage coordinates).
+        When the beam is not perpendicular to the sample plane, the sample is foreshortened
+        along the image Y axis (the tilt axis is the image X axis), by sin(angle between beam and sample).
+        :param beam: "SEM" or "FIB"
+        :return: the scale factor (>= 1). 1 if the sample plane tilt is unknown for the current posture.
+        """
+        if beam not in ("SEM", "FIB"):
+            raise ValueError(f"Unknown beam {beam}, should be 'SEM' or 'FIB'")
+
+        posture = self.current_posture.value
+        if self.pre_tilt is None or "rx" not in self.stage.axes:
+            return 1.0
+
+        # Tilt of the sample plane normal compared to the SEM beam. The pre-tilt has the opposite
+        # direction in the postures with an rz rotated by 180° (cf calculate_stage_tilt()).
+        rx = self.stage.position.value["rx"]
+        if posture in (Posture.SEM_IMAGING, Posture.MILLING, Posture.FIB_VIEW_FM):
+            sample_tilt = rx - self.pre_tilt
+        elif posture in (Posture.TRENCHING, Posture.FIB_IMAGING):
+            sample_tilt = rx + self.pre_tilt
+        else:
+            return 1.0
+
+        # sin(angle between the beam and the sample plane) = cos(angle between the beam and the sample normal)
+        if beam == "SEM":
+            sin_angle = math.cos(sample_tilt)
+        else:
+            sin_angle = math.cos(self.fib_column_tilt - sample_tilt)
+        return 1 / max(abs(sin_angle), MIN_BEAM_ANGLE_SIN)
 
     def to_posture(self, pos: Dict[str, float], posture: Posture) -> Dict[str, float]:
         """Convert a stage-bare position to a position in the target posture.

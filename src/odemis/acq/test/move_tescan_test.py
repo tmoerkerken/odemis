@@ -26,6 +26,7 @@ from odemis import model
 from odemis.acq.test import move_tfs1_test, move_tfs3_test
 from odemis.util import testing
 from odemis.acq.move import MeteorTescan1PostureManager, MicroscopePostureManager, Posture
+from odemis.gui.model import FibsemBeamView
 
 logging.getLogger().setLevel(logging.DEBUG)
 logging.basicConfig(format="%(asctime)s  %(levelname)-7s %(module)s:%(lineno)d %(message)s")
@@ -325,6 +326,22 @@ class TestMeteorTescan1FibsemMove(move_tfs3_test.TestMeteorTFS3Move):
         self.pm.switch_posture(Posture.MILLING).result()
         time.sleep(0.5)
         testing.assert_pos_almost_equal(sample_stage.position.value, initial_sample_stage_pos, atol=4e-6)
+
+    def test_fib_view_drag_moves_more_when_milling(self):
+        """In milling posture, the FIB sees the sample at a grazing angle: dragging the view by 10 µm
+        in Y must move the sample by 10 µm / sin(milling angle), and X is unchanged."""
+        self.pm.switch_posture(Posture.MILLING).result()
+        view = FibsemBeamView("FIB", posture_manager=self.pm)
+        drag = 10e-6  # m, as seen in the FIB view
+        old_pos = self.stage.position.value
+
+        view.moveStageBy((drag, drag)).result()
+
+        new_pos = self.stage.position.value
+        self.assertAlmostEqual(new_pos["x"] - old_pos["x"], drag, delta=1e-6)
+        expected_y = drag / math.sin(self.pm.milling_angle.value)
+        self.assertGreater(expected_y, 4 * drag)  # at 10°, the sample moves ~5.8x more than the drag
+        self.assertAlmostEqual(new_pos["y"] - old_pos["y"], expected_y, delta=1e-6)
 
     def test_milling_position_contains_only_stage_axes(self):
         sem_position = self.pm.get_target_position(Posture.SEM_IMAGING)

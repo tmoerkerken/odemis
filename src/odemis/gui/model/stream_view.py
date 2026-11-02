@@ -362,6 +362,15 @@ class StreamView(View):
         q.put(val)
         return val
 
+    def _convert_shift_to_stage(self, shift: Tuple[float, float]) -> Tuple[float, float]:
+        """
+        Convert a shift in the view (physical coordinates) to a shift of the stage.
+        Can be overridden by subclasses when the view is not a plain top-down view of the stage plane.
+        :param shift: X, Y shift in the view, in m
+        :return: X, Y shift to apply to the stage, in m
+        """
+        return shift
+
     def moveStageBy(self, shift):
         """
         Request a relative move of the stage
@@ -370,6 +379,8 @@ class StreamView(View):
         """
         if not self._stage:
             return None
+
+        shift = self._convert_shift_to_stage(shift)
 
         # TODO: Use the max FoV of the streams to determine what's a big
         # distance (because on the overview cam a move can be much bigger than
@@ -663,6 +674,27 @@ class MicroscopeView(StreamView):
         """
         super(MicroscopeView, self)._on_stage_move_done(f)
         self._on_stage_pos(self.stage_pos.value)
+
+
+class FibsemBeamView(MicroscopeView):
+    """
+    View of the sample through the SEM or FIB beam, which might not be perpendicular to the sample plane.
+    The sample is then foreshortened along the Y axis of the view, so a shift in the view
+    corresponds to a larger shift on the sample plane (= the sample-stage Y axis).
+    """
+    def __init__(self, name, posture_manager, **kwargs):
+        """
+        :param name: "SEM" or "FIB", which also defines the beam used to image the sample
+        :param posture_manager: used to know the angle between the beam and the sample plane,
+          and provides the sample stage to move
+        """
+        MicroscopeView.__init__(self, name, stage=posture_manager.sample_stage, **kwargs)
+        self._posture_manager = posture_manager
+        self._beam = name
+
+    def _convert_shift_to_stage(self, shift: Tuple[float, float]) -> Tuple[float, float]:
+        scale = self._posture_manager.get_beam_view_y_scale(self._beam)
+        return shift[0], shift[1] * scale
 
 
 class ContentView(StreamView):

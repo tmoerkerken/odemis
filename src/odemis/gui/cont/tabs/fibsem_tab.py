@@ -275,16 +275,16 @@ class FibsemTab(Tab):
         vpv = collections.OrderedDict([
             (viewports[0],  # focused view
              {
-                "cls": guimod.MicroscopeView,
-                "stage": main_data.stage,
                 "name": "SEM",
+                "cls": guimod.FibsemBeamView,
+                "posture_manager": main_data.posture_manager,
                 "stream_classes": SEMStream,
               }),
             (viewports[1],
              {
-                "cls": guimod.MicroscopeView,
                 "name": "FIB",
-                "stage": main_data.stage,
+                "cls": guimod.FibsemBeamView,
+                "posture_manager": main_data.posture_manager,
                 "stream_classes": FIBStream,
               }),
             (viewports[2],
@@ -381,6 +381,9 @@ class FibsemTab(Tab):
             # Only take the "vertical" displacement, since horizontal displacement
             # is not desired for the coincidental alignment process.
             dy = p_pos[1] - init_pos[1]
+
+            # A vertical move in the chamber is seen in the FIB image foreshortened by sin(column tilt)
+            dy /= math.sin(self.pm.fib_column_tilt)
 
             # invert dy if scan rotated.
             if numpy.isclose(self.main_data.ion_beam.rotation.value,
